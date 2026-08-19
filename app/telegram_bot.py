@@ -1,21 +1,30 @@
-"""Telegram bot with an interactive button menu.
+"""Telegram bot with an interactive button menu (aiogram).
 
-Long-polls the Bot API in a background thread. Features:
+Features:
 - Reply keyboard menu: New reminder / My reminders / Help / Bind account
 - Inline keyboards: interval presets, per-job pause/resume/delete buttons
 - /bind <code> links a chat to a website account
 - Text commands: /new, /once, /list, /pause, /resume, /delete
 - Sending reminders is handled by app/scheduler.py (_send_telegram)
 """
+import asyncio
 import html
-import json
 import logging
-import threading
-import time
-import urllib.error
-import urllib.request
 from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
+
+from aiogram import Bot, Dispatcher
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    KeyboardButton,
+    Message,
+    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
+)
 
 from app import config
 from app.database import SessionLocal
@@ -25,60 +34,77 @@ from app.scheduler import humanize_interval, sync_jobs
 log = logging.getLogger("telegram")
 log.setLevel(logging.INFO)
 
-_poll_thread: threading.Thread | None = None
-_stop = False
+_bot: Bot | None = None
+_loop: asyncio.AbstractEventLoop | None = None
 
 # per-chat state for the "new reminder" flow: {chat_id: {"step": ..., "minutes": ...}}
 _states: dict[int, dict] = {}
 
 
-# ─────────────────────────── low-level API ───────────────────────────
+# ─────────────────────────── low-level API (aiogram) ───────────────────────────
 
-def _api(method: str, payload: dict | None = None, timeout: int = 20) -> dict:
-    if not config.TELEGRAM_BOT_TOKEN:
-        raise RuntimeError("TELEGRAM_BOT_TOKEN is not set in .env")
-    url = f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/{method}"
-    data = json.dumps(payload or {}).encode()
-    req = urllib.request.Request(
-        url, data=data, headers={"Content-Type": "application/json"}
-    )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read().decode())
+def _to_markup(raw: dict | None):
+    """Convert the plain-dict keyboards used by the logic layer to aiogram objects."""
+    if raw is None:
+        return None
+    if "keyboard" in raw:
+        return ReplyKeyboardMarkup(
+            keyboard=[[KeyboardButton(text=b["text"]) for b in row] for row in raw["keyboard"]],
+            resize_keyboard=True,
+        )
+    if "remove_keyboard" in raw:
+        return ReplyKeyboardRemove()
+    if "inline_keyboard" in raw:
+        return InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text=b["text"], callback_data=b["callback_data"]) for b in row]
+                for row in raw["inline_keyboard"]
+            ]
+        )
+    return None
+
+
+def _run_coro(coro, timeout: float = 20):
+    """Schedule a coroutine onto the bot's event loop and wait for the result."""
+    if _loop is None or _bot is None:
+        raise RuntimeError("Telegram bot is not running")
+    return asyncio.run_coroutine_threadsafe(coro, _loop).result(timeout=timeout)
 
 
 def get_me() -> dict | None:
     try:
-        data = _api("getMe")
-        if data.get("ok"):
-            return data["result"]
+        if _bot is None:
+            return None
+        me = _run_coro(_bot.get_me(), timeout=10)
+        return {"username": me.username, "first_name": me.first_name} if me else None
     except Exception as e:
         log.warning("getMe failed: %s", e)
-    return None
+        return None
 
 
 def send_message(chat_id, text: str, reply_markup=None) -> None:
-    payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
-    if reply_markup is not None:
-        payload["reply_markup"] = reply_markup
-    data = _api("sendMessage", payload)
-    if not data.get("ok"):
-        raise RuntimeError(f"Telegram API error: {data}")
+    if _bot is None:
+        raise RuntimeError("Telegram bot is not running")
+    _run_coro(_bot.send_message(chat_id, text, reply_markup=_to_markup(reply_markup)))
 
 
 def edit_message(chat_id, message_id, text: str, reply_markup=None) -> None:
-    payload = {
-        "chat_id": chat_id,
-        "message_id": message_id,
-        "text": text,
-        "parse_mode": "HTML",
-    }
-    if reply_markup is not None:
-        payload["reply_markup"] = reply_markup
-    _api("editMessageText", payload)
+    if _bot is None:
+        raise RuntimeError("Telegram bot is not running")
+    _run_coro(
+        _bot.edit_message_text(
+            text,
+            chat_id=chat_id,
+            message_id=message_id,
+            reply_markup=_to_markup(reply_markup),
+        )
+    )
 
 
 def answer_callback(query_id, text: str) -> None:
-    _api("answerCallbackQuery", {"callback_query_id": query_id, "text": text})
+    if _bot is None:
+        raise RuntimeError("Telegram bot is not running")
+    _run_coro(_bot.answer_callback_query(query_id, text=text), timeout=10)
 
 
 # ─────────────────────────── keyboards ───────────────────────────
@@ -504,66 +530,66 @@ def _handle_callback(chat_id, query_id, message_id, data: str) -> None:
             edit_message(chat_id, message_id, text, reply_markup=kb)
         else:
             log.warning("unknown callback data: %s", data)
-    except urllib.error.HTTPError as e:
-        if e.code == 400 and "not modified" in str(e).lower():
+    except Exception as e:
+        if getattr(e, "code", None) == 400 and "not modified" in str(e).lower():
             log.info("callback edit: message not modified — ignoring")
         else:
             log.warning("callback handling failed: %s", e)
-    except Exception as e:
-        log.warning("callback handling failed: %s", e)
 
 
-# ─────────────────────────── polling loop ───────────────────────────
+# ─────────────────────────── aiogram handlers & lifecycle ───────────────────────────
 
-def _poll_loop() -> None:
-    global _stop
-    offset = 0
-    while not _stop:
-        try:
-            data = _api("getUpdates", {"offset": offset, "timeout": 25}, timeout=35)
-            if data.get("ok"):
-                for upd in data.get("result", []):
-                    offset = upd["update_id"] + 1
-                    if "message" in upd:
-                        msg = upd["message"]
-                        chat = msg.get("chat") or {}
-                        chat_id = chat.get("id")
-                        text = msg.get("text")
-                        if chat_id is not None and text is not None:
-                            try:
-                                _handle_message(chat_id, text)
-                            except Exception as e:
-                                log.warning("message handling failed: %s", e)
-                                try:
-                                    send_message(chat_id, f"⚠️ Error: {html.escape(str(e))}")
-                                except Exception:
-                                    pass
-                    elif "callback_query" in upd:
-                        cq = upd["callback_query"]
-                        chat_id = (cq.get("message") or {}).get("chat", {}).get("id")
-                        query_id = cq.get("id")
-                        message_id = (cq.get("message") or {}).get("message_id")
-                        data = cq.get("data")
-                        if chat_id is not None and data:
-                            _handle_callback(chat_id, query_id, message_id, data)
-        except Exception as e:
-            # 409 = another long-poll is active (e.g. leftover from a restart) — back off longer
-            code = getattr(e, "code", None)
-            log.warning("getUpdates failed: %s", e)
-            time.sleep(30 if code == 409 else 5)
+async def _on_message(message: Message) -> None:
+    if not message.text:
+        return
+    # run the sync logic in a worker thread so the event loop stays responsive
+    await asyncio.to_thread(_handle_message, message.chat.id, message.text)
 
 
-def start() -> None:
-    global _poll_thread, _stop
+async def _on_callback(cq: CallbackQuery) -> None:
+    if not cq.data or not cq.message:
+        return
+    await asyncio.to_thread(
+        _handle_callback, cq.message.chat.id, cq.id, cq.message.message_id, cq.data
+    )
+
+
+async def _main() -> None:
+    global _bot
+    _bot = Bot(
+        token=config.TELEGRAM_BOT_TOKEN,
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+    )
+    dp = Dispatcher()
+    dp.message.register(_on_message)
+    dp.callback_query.register(_on_callback)
+    # clear any stale webhook / pending long-polls that would block getUpdates
+    await _bot.delete_webhook(drop_pending_updates=True)
+    log.info("Telegram bot polling started (aiogram)")
+    await dp.start_polling(_bot)
+
+
+def start_on_loop():
+    """Start polling as a task on the app's main event loop.
+
+    Returns the task (or None when the bot is disabled). aiogram/aiohttp need
+    the main thread's loop, so we share uvicorn's loop instead of a thread.
+    """
+    global _loop
     if not config.TELEGRAM_BOT_TOKEN:
         log.info("TELEGRAM_BOT_TOKEN not set — Telegram bot disabled")
-        return
-    _stop = False
-    _poll_thread = threading.Thread(target=_poll_loop, daemon=True, name="telegram-bot")
-    _poll_thread.start()
-    log.info("Telegram bot polling started")
+        return None
+    _loop = asyncio.get_running_loop()
+    task = _loop.create_task(_main())
+    log.info("Telegram bot task scheduled on main loop")
+    return task
 
 
-def stop() -> None:
-    global _stop
-    _stop = True
+def stop_on_loop(task) -> None:
+    global _bot
+    if task is not None:
+        try:
+            task.cancel()
+        except Exception:
+            pass
+    _bot = None

@@ -44,9 +44,9 @@ STATIC = ROOT / "static"
 async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
     start()
-    telegram_bot.start()
+    tg_task = telegram_bot.start_on_loop()
     yield
-    telegram_bot.stop()
+    telegram_bot.stop_on_loop(tg_task)
     shutdown()
 
 

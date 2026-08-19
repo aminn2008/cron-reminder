@@ -7,6 +7,7 @@ import uuid
 os.environ["DATABASE_URL"] = "sqlite:///" + tempfile.mktemp(suffix=".db")
 os.environ["SMTP_USER"] = ""
 os.environ["SMTP_PASSWORD"] = ""
+os.environ["TELEGRAM_BOT_TOKEN"] = ""  # keep the real bot out of tests
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

@@ -10,14 +10,24 @@ from app.models import CronJob, User
 
 @pytest.fixture
 def tg_api_stub(monkeypatch):
-    """Stub the Telegram API so no real network calls happen."""
+    """Stub the Telegram messaging functions so no real network calls happen."""
     calls = []
 
-    def fake_api(method, payload=None, timeout=20):
-        calls.append((method, payload or {}))
-        return {"ok": True, "result": []}
+    def fake_send(chat_id, text, reply_markup=None):
+        calls.append(("sendMessage", {"chat_id": chat_id, "text": text}))
+        return None
 
-    monkeypatch.setattr(telegram_bot, "_api", fake_api)
+    def fake_edit(chat_id, message_id, text, reply_markup=None):
+        calls.append(("editMessageText", {"chat_id": chat_id, "message_id": message_id, "text": text}))
+        return None
+
+    def fake_answer(query_id, text):
+        calls.append(("answerCallbackQuery", {"callback_query_id": query_id, "text": text}))
+        return None
+
+    monkeypatch.setattr(telegram_bot, "send_message", fake_send)
+    monkeypatch.setattr(telegram_bot, "edit_message", fake_edit)
+    monkeypatch.setattr(telegram_bot, "answer_callback", fake_answer)
     return calls
 
 
