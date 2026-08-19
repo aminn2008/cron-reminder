@@ -64,6 +64,13 @@ def _to_markup(raw: dict | None):
     return None
 
 
+def _to_edit_markup(raw: dict | None):
+    """editMessageText only accepts inline keyboards — reply keyboards are invalid there."""
+    if raw and "inline_keyboard" in raw:
+        return _to_markup(raw)
+    return None
+
+
 def _run_coro(coro, timeout: float = 20):
     """Schedule a coroutine onto the bot's event loop and wait for the result."""
     if _loop is None or _bot is None:
@@ -96,7 +103,7 @@ def edit_message(chat_id, message_id, text: str, reply_markup=None) -> None:
             text,
             chat_id=chat_id,
             message_id=message_id,
-            reply_markup=_to_markup(reply_markup),
+            reply_markup=_to_edit_markup(reply_markup),
         )
     )
 
@@ -139,6 +146,14 @@ PRESET_KEYBOARD = _inline([
         {"text": "Custom minutes...", "callback_data": "new:custom"},
     ],
 ])
+
+
+def _channel_keyboard(user) -> dict:
+    return _inline([
+        [{"text": f"📧 Email — {user.email}", "callback_data": "ch:email"}],
+        [{"text": "📱 Telegram only", "callback_data": "ch:telegram"}],
+        [{"text": "📧 + 📱 Both", "callback_data": "ch:both"}],
+    ])
 
 
 def _help_text() -> str:
@@ -189,21 +204,36 @@ def _get_job(user_id: int, job_id: int):
         db.close()
 
 
-def _create_job(chat_id, name: str, minutes: int | None = None, send_once_at=None) -> None:
+def _create_job(
+    chat_id,
+    name: str,
+    message: str | None = None,
+    minutes: int | None = None,
+    send_once_at=None,
+    channels: str = "both",
+) -> None:
+    """Create a reminder. channels: 'email' | 'telegram' | 'both'."""
     user = _get_user(chat_id)
     if not user:
         _need_bind(chat_id)
         return
+    message = (message or name)[:1000]
+    if channels == "email":
+        email_to, tg = user.email, None
+    elif channels == "telegram":
+        email_to, tg = None, str(chat_id)
+    else:
+        email_to, tg = user.email, str(chat_id)
     db = SessionLocal()
     try:
         job = CronJob(
             user_id=user.id,
-            name=name,
-            message=name,
+            name=name[:120],
+            message=message,
             interval_minutes=minutes,
             send_once_at=send_once_at,
-            email_to=user.email,
-            telegram_chat_id=str(chat_id),
+            email_to=email_to,
+            telegram_chat_id=tg,
             timezone=config.DEFAULT_TZ,
         )
         db.add(job)
@@ -436,7 +466,7 @@ def _handle_message(chat_id, text: str) -> None:
         _handle_command(chat_id, text)
         return
 
-    # state machine: waiting for interval / name
+    # state machine: waiting for interval → message → channel
     state = _states.get(chat_id)
     if state and state.get("step") == "minutes":
         try:
@@ -447,23 +477,28 @@ def _handle_message(chat_id, text: str) -> None:
         if minutes < 1:
             send_message(chat_id, "Minimum interval is 1 minute.")
             return
-        _states[chat_id] = {"step": "name", "minutes": minutes}
+        _states[chat_id] = {"step": "message", "minutes": minutes}
         send_message(
             chat_id,
-            f"⏱ Every {humanize_interval(minutes)}\n\nNow send the reminder name:",
-            NO_KEYBOARD,
+            f"⏱ Every {humanize_interval(minutes)}\n\nNow send the reminder <b>message</b> "
+            "(what it should say):",
         )
         return
 
-    if state and state.get("step") == "name":
-        name = text[:120]
-        _create_job(chat_id, name, minutes=state.get("minutes"))
-        _states.pop(chat_id, None)
+    if state and state.get("step") == "message":
+        user = _get_user(chat_id)
+        if not user:
+            _need_bind(chat_id)
+            return
+        _states[chat_id] = {
+            "step": "channel",
+            "minutes": state.get("minutes"),
+            "message": text[:1000],
+        }
         send_message(
             chat_id,
-            f"✅ Reminder created: <b>{html.escape(name)}</b> — {humanize_interval(state.get('minutes'))}\n\n"
-            "Manage it anytime with 📋 My reminders.",
-            MAIN_KEYBOARD,
+            f"📝 <b>Message:</b> {html.escape(text[:1000])}\n\nWhere should I send it?",
+            reply_markup=_channel_keyboard(user),
         )
         return
 
@@ -480,12 +515,12 @@ def _handle_callback(chat_id, query_id, message_id, data: str) -> None:
     try:
         if data.startswith("new:preset:"):
             minutes = int(data.split(":")[2])
-            _states[chat_id] = {"step": "name", "minutes": minutes}
+            _states[chat_id] = {"step": "message", "minutes": minutes}
             edit_message(
                 chat_id,
                 message_id,
-                f"⏱ Every {humanize_interval(minutes)}\n\nNow send the reminder name:",
-                NO_KEYBOARD,
+                f"⏱ Every {humanize_interval(minutes)}\n\nNow send the reminder <b>message</b> "
+                "(what it should say):",
             )
         elif data == "new:custom":
             _states[chat_id] = {"step": "minutes"}
@@ -493,8 +528,32 @@ def _handle_callback(chat_id, query_id, message_id, data: str) -> None:
                 chat_id,
                 message_id,
                 "How often? Send minutes directly (e.g. 90 = every 1 hour 30 minutes):",
-                NO_KEYBOARD,
             )
+        elif data.startswith("ch:"):
+            user = _get_user(chat_id)
+            if not user:
+                _need_bind(chat_id)
+                return
+            state = _states.pop(chat_id, None)
+            if not state or state.get("step") != "channel":
+                edit_message(chat_id, message_id, "⚠️ The flow expired — press ➕ New reminder to start again.")
+                return
+            minutes = state.get("minutes")
+            message_text = state.get("message") or "Reminder"
+            channels = data.split(":")[1]  # email | telegram | both
+            _create_job(chat_id, message_text[:120], message=message_text, minutes=minutes, channels=channels)
+            email_desc = user.email if channels in ("email", "both") else "—"
+            tg_desc = "✅" if channels in ("telegram", "both") else "—"
+            edit_message(
+                chat_id,
+                message_id,
+                f"✅ <b>Reminder created!</b>\n\n"
+                f"📝 {html.escape(message_text)}\n"
+                f"⏱ Every {humanize_interval(minutes)}\n"
+                f"📧 {html.escape(email_desc)}\n"
+                f"📱 {tg_desc}",
+            )
+            send_message(chat_id, "Manage it anytime with 📋 My reminders.", MAIN_KEYBOARD)
         elif data == "menu:main":
             edit_message(chat_id, message_id, _help_text())
         elif data == "menu:list":

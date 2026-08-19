@@ -80,22 +80,52 @@ def test_menu_button_new_flow(client, tg_api_stub):
     telegram_bot._handle_message(777, "➕ New reminder")
     telegram_bot._handle_message(777, "30")
     telegram_bot._handle_message(777, "Coffee time")
+    telegram_bot._handle_callback(777, "q", 10, "ch:both")
 
     jobs = _jobs_of(username)
     assert len(jobs) == 1
     assert jobs[0].interval_minutes == 30
     assert jobs[0].telegram_chat_id == "777"
     assert jobs[0].name == "Coffee time"
+    assert jobs[0].message == "Coffee time"
     assert jobs[0].email_to == f"{username}@example.com"  # default email applied
+
+
+def test_channel_email_only(client, tg_api_stub):
+    username = _bind(client)
+    telegram_bot._handle_message(777, "➕ New reminder")
+    telegram_bot._handle_message(777, "60")
+    telegram_bot._handle_message(777, "Email only reminder")
+    telegram_bot._handle_callback(777, "q", 10, "ch:email")
+
+    jobs = _jobs_of(username)
+    assert len(jobs) == 1
+    assert jobs[0].email_to == f"{username}@example.com"
+    assert jobs[0].telegram_chat_id is None
+
+
+def test_channel_telegram_only(client, tg_api_stub):
+    username = _bind(client)
+    telegram_bot._handle_message(777, "➕ New reminder")
+    telegram_bot._handle_message(777, "120")
+    telegram_bot._handle_message(777, "Telegram only reminder")
+    telegram_bot._handle_callback(777, "q", 10, "ch:telegram")
+
+    jobs = _jobs_of(username)
+    assert len(jobs) == 1
+    assert jobs[0].email_to is None
+    assert jobs[0].telegram_chat_id == "777"
 
 
 def test_preset_callback_flow(client, tg_api_stub):
     username = _bind(client)
     telegram_bot._handle_callback(777, "q1", 10, "new:preset:60")
     telegram_bot._handle_message(777, "Stand up")
+    telegram_bot._handle_callback(777, "q1", 10, "ch:both")
 
     jobs = _jobs_of(username)
     assert jobs[0].interval_minutes == 60
+    assert jobs[0].message == "Stand up"
 
 
 def test_custom_minutes_callback(client, tg_api_stub):
@@ -103,9 +133,11 @@ def test_custom_minutes_callback(client, tg_api_stub):
     telegram_bot._handle_callback(777, "q1", 10, "new:custom")
     telegram_bot._handle_message(777, "90")
     telegram_bot._handle_message(777, "Stretch")
+    telegram_bot._handle_callback(777, "q1", 10, "ch:both")
 
     jobs = _jobs_of(username)
     assert jobs[0].interval_minutes == 90
+    assert jobs[0].message == "Stretch"
 
 
 def test_once_command(client, tg_api_stub):
