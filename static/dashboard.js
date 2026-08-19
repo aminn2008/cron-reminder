@@ -229,14 +229,20 @@ async function runNow(id) {
 }
 
 async function toggleJob(id) {
-  await api(`/api/jobs/${id}/toggle`, { method: 'POST' });
-  await Promise.all([loadJobs(), loadStats()]);
+  try {
+    await api(`/api/jobs/${id}/toggle`, { method: 'POST' });
+    await Promise.all([loadJobs(), loadStats()]);
+  } catch (e) { toast(e.message, 'error'); }
 }
 
 async function deleteJob(id) {
   if (!confirm('Delete this reminder?')) return;
-  await api(`/api/jobs/${id}`, { method: 'DELETE' });
-  toast('Reminder deleted', 'success');
+  try {
+    await api(`/api/jobs/${id}`, { method: 'DELETE' });
+    toast('Reminder deleted', 'success');
+  } catch (e) {
+    toast(e.message, 'error');  // surface failures instead of silently ignoring them
+  }
   await Promise.all([loadJobs(), loadStats()]);
 }
 

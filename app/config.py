@@ -14,6 +14,9 @@ EMAIL_FROM = os.getenv("EMAIL_FROM", "") or SMTP_USER
 # ─── تلگرام ───
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 
+# ─── آدرس اپ (برای دکمه‌ی وب‌اپ تلگرام) ───
+APP_URL = os.getenv("APP_URL", "https://meow.bahari.tr")
+
 # ─── منطقه زمانی پیش‌فرض ───
 DEFAULT_TZ = os.getenv("TZ", "Asia/Tehran")
 

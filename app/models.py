@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
@@ -40,6 +41,11 @@ class CronJob(Base):
     __tablename__ = "cron_jobs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # stable identity: survives SQLite rowid reuse so stale scheduler triggers
+    # can never alias a brand-new job that happens to get the same numeric id
+    uid: Mapped[str] = mapped_column(
+        String(32), unique=True, index=True, default=lambda: uuid.uuid4().hex
+    )
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )

@@ -43,3 +43,25 @@ async function doRegister(e) {
 api('/api/me')
   .then(() => (location.href = '/dashboard'))
   .catch(() => {});
+
+// Telegram Web App (Mini App): auto-login with initData
+async function tryTelegramWebApp() {
+  try {
+    const tg = window.Telegram && window.Telegram.WebApp;
+    if (!tg || !tg.initData) return false;
+    tg.expand();
+    const res = await fetch('/api/telegram/webapp-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ init_data: tg.initData }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      location.href = '/dashboard';
+      return true;
+    }
+    toast(data.detail || 'Telegram login failed', 'error');
+  } catch (e) {}
+  return false;
+}
+tryTelegramWebApp();

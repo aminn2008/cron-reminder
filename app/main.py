@@ -1,5 +1,6 @@
 """Cron Reminder — scheduled reminder service
 Full API: auth, interval/one-shot job management, run-now, logs, admin panel, Telegram."""
+import logging
 import secrets
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
@@ -22,6 +23,7 @@ from app.auth import (
     verify_password,
 )
 from app.database import Base, engine, get_db
+from app.logging_setup import setup_logging
 from app.models import AuthSession, CronJob, JobLog, User
 from app import telegram_bot
 from app.scheduler import (
@@ -34,6 +36,9 @@ from app.scheduler import (
     start,
     sync_jobs,
 )
+
+setup_logging()
+log = logging.getLogger("app")
 
 ROOT = Path(__file__).resolve().parent.parent
 PAGES = ROOT / "pages"
@@ -225,6 +230,29 @@ def telegram_unbind(
     user.telegram_chat_id = None
     db.commit()
     return {"success": True}
+
+
+class WebAppLoginBody(BaseModel):
+    init_data: str
+
+
+@app.post("/api/telegram/webapp-login")
+def webapp_login(body: WebAppLoginBody, db: Session = Depends(get_db)):
+    """Log in via Telegram Web App initData (HMAC-validated)."""
+    user_data = telegram_bot.validate_init_data(body.init_data)
+    if not user_data:
+        raise HTTPException(401, "Invalid Telegram session")
+    tg_id = str(user_data.get("id"))
+    user = db.query(User).filter(User.telegram_chat_id == tg_id).first()
+    if not user:
+        raise HTTPException(
+            400,
+            "This Telegram account is not linked yet — open the bot chat and send /bind <code> first",
+        )
+    token = create_session(db, user.id)
+    resp = JSONResponse({"user": user_dict(user)})
+    resp.set_cookie("session", token, httponly=True, samesite="lax", max_age=60 * 60 * 24 * 30)
+    return resp
 
 
 # ─────────────────────────── auth ───────────────────────────
@@ -440,6 +468,7 @@ def delete_job(
     db.delete(job)
     db.commit()
     sync_jobs()
+    log.info("job %s deleted by user %s (web)", job_id, user.id)
     return {"success": True}
 
 

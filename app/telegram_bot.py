@@ -8,8 +8,13 @@ Features:
 - Sending reminders is handled by app/scheduler.py (_send_telegram)
 """
 import asyncio
+import hashlib
+import hmac
 import html
+import json
 import logging
+import time
+import urllib.parse
 from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
@@ -21,9 +26,11 @@ from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     KeyboardButton,
+    MenuButtonWebApp,
     Message,
     ReplyKeyboardMarkup,
     ReplyKeyboardRemove,
+    WebAppInfo,
 )
 
 from app import config
@@ -47,9 +54,15 @@ def _to_markup(raw: dict | None):
     """Convert the plain-dict keyboards used by the logic layer to aiogram objects."""
     if raw is None:
         return None
+
+    def btn(b: dict):
+        if "web_app" in b:
+            return KeyboardButton(text=b["text"], web_app=WebAppInfo(url=b["web_app"]))
+        return KeyboardButton(text=b["text"])
+
     if "keyboard" in raw:
         return ReplyKeyboardMarkup(
-            keyboard=[[KeyboardButton(text=b["text"]) for b in row] for row in raw["keyboard"]],
+            keyboard=[[btn(b) for b in row] for row in raw["keyboard"]],
             resize_keyboard=True,
         )
     if "remove_keyboard" in raw:
@@ -114,6 +127,17 @@ def answer_callback(query_id, text: str) -> None:
     _run_coro(_bot.answer_callback_query(query_id, text=text), timeout=10)
 
 
+def _safe_edit(chat_id, message_id, text: str, reply_markup=None) -> None:
+    """Edit a message; Telegram's 'message is not modified' is a harmless no-op."""
+    try:
+        edit_message(chat_id, message_id, text, reply_markup=reply_markup)
+    except Exception as e:
+        if getattr(e, "code", None) == 400 and "not modified" in str(e).lower():
+            log.info("edit: message not modified — ignoring")
+        else:
+            raise
+
+
 # ─────────────────────────── keyboards ───────────────────────────
 
 def _inline(rows: list) -> dict:
@@ -124,6 +148,7 @@ MAIN_KEYBOARD = {
     "keyboard": [
         [{"text": "➕ New reminder"}, {"text": "📋 My reminders"}],
         [{"text": "❓ Help"}, {"text": "🔗 Bind account"}],
+        [{"text": "🌐 Open Web App", "web_app": config.APP_URL}],
     ],
     "resize_keyboard": True,
 }
@@ -398,6 +423,7 @@ def _cmd_delete(chat_id, args) -> None:
     finally:
         db.close()
     sync_jobs()
+    log.info("user %s deleted job %s (%s) via /delete", user.id, job.id, job.name)
     send_message(chat_id, f"🗑 Deleted: <b>{html.escape(job.name)}</b>")
 
 
@@ -507,16 +533,12 @@ def _handle_message(chat_id, text: str) -> None:
 
 
 def _handle_callback(chat_id, query_id, message_id, data: str) -> None:
-    # answer first so the button spinner stops immediately
-    try:
-        answer_callback(query_id, "Done ✅")
-    except Exception as e:
-        log.warning("answer_callback failed: %s", e)
+    result = "Done ✅"  # what the button toast will say — set by each branch
     try:
         if data.startswith("new:preset:"):
             minutes = int(data.split(":")[2])
             _states[chat_id] = {"step": "message", "minutes": minutes}
-            edit_message(
+            _safe_edit(
                 chat_id,
                 message_id,
                 f"⏱ Every {humanize_interval(minutes)}\n\nNow send the reminder <b>message</b> "
@@ -524,7 +546,7 @@ def _handle_callback(chat_id, query_id, message_id, data: str) -> None:
             )
         elif data == "new:custom":
             _states[chat_id] = {"step": "minutes"}
-            edit_message(
+            _safe_edit(
                 chat_id,
                 message_id,
                 "How often? Send minutes directly (e.g. 90 = every 1 hour 30 minutes):",
@@ -536,15 +558,16 @@ def _handle_callback(chat_id, query_id, message_id, data: str) -> None:
                 return
             state = _states.pop(chat_id, None)
             if not state or state.get("step") != "channel":
-                edit_message(chat_id, message_id, "⚠️ The flow expired — press ➕ New reminder to start again.")
+                _safe_edit(chat_id, message_id, "⚠️ The flow expired — press ➕ New reminder to start again.")
                 return
             minutes = state.get("minutes")
             message_text = state.get("message") or "Reminder"
             channels = data.split(":")[1]  # email | telegram | both
             _create_job(chat_id, message_text[:120], message=message_text, minutes=minutes, channels=channels)
+            result = "Reminder created ✅"
             email_desc = user.email if channels in ("email", "both") else "—"
             tg_desc = "✅" if channels in ("telegram", "both") else "—"
-            edit_message(
+            _safe_edit(
                 chat_id,
                 message_id,
                 f"✅ <b>Reminder created!</b>\n\n"
@@ -555,14 +578,14 @@ def _handle_callback(chat_id, query_id, message_id, data: str) -> None:
             )
             send_message(chat_id, "Manage it anytime with 📋 My reminders.", MAIN_KEYBOARD)
         elif data == "menu:main":
-            edit_message(chat_id, message_id, _help_text())
+            _safe_edit(chat_id, message_id, _help_text())
         elif data == "menu:list":
             user = _get_user(chat_id)
             if not user:
                 _need_bind(chat_id)
                 return
             text, kb = _render_list(user)
-            edit_message(chat_id, message_id, text, reply_markup=kb)
+            _safe_edit(chat_id, message_id, text, reply_markup=kb)
         elif data.startswith("job:"):
             user = _get_user(chat_id)
             if not user:
@@ -577,23 +600,32 @@ def _handle_callback(chat_id, query_id, message_id, data: str) -> None:
                 if job:
                     if action == "pause":
                         job.enabled = False
+                        result = "Paused ⏸"
                     elif action == "resume":
                         job.enabled = True
+                        result = "Resumed ▶️"
                     elif action == "del":
                         db.delete(job)
+                        result = "Deleted ✅"
+                        log.info("user %s deleted job %s (%s) via callback", user.id, job.id, job.name)
                     db.commit()
+                else:
+                    result = "Reminder not found"
             finally:
                 db.close()
             sync_jobs()
             text, kb = _render_list(user)
-            edit_message(chat_id, message_id, text, reply_markup=kb)
+            _safe_edit(chat_id, message_id, text, reply_markup=kb)
         else:
             log.warning("unknown callback data: %s", data)
     except Exception as e:
-        if getattr(e, "code", None) == 400 and "not modified" in str(e).lower():
-            log.info("callback edit: message not modified — ignoring")
-        else:
-            log.warning("callback handling failed: %s", e)
+        log.warning("callback handling failed: %s", e)
+        result = "Error ❌"
+    finally:
+        try:
+            answer_callback(query_id, result)
+        except Exception as e:
+            log.warning("answer_callback failed: %s", e)
 
 
 # ─────────────────────────── aiogram handlers & lifecycle ───────────────────────────
@@ -624,6 +656,17 @@ async def _main() -> None:
     dp.callback_query.register(_on_callback)
     # clear any stale webhook / pending long-polls that would block getUpdates
     await _bot.delete_webhook(drop_pending_updates=True)
+    # "Open App" button next to the chat input (Web App / Mini App)
+    try:
+        await _bot.set_chat_menu_button(
+            menu_button=MenuButtonWebApp(
+                text="🌐 Open App",
+                web_app=WebAppInfo(url=config.APP_URL),
+            )
+        )
+        log.info("Web App menu button set: %s", config.APP_URL)
+    except Exception as e:
+        log.warning("set_chat_menu_button failed: %s", e)
     log.info("Telegram bot polling started (aiogram)")
     await dp.start_polling(_bot)
 
@@ -642,6 +685,34 @@ def start_on_loop():
     task = _loop.create_task(_main())
     log.info("Telegram bot task scheduled on main loop")
     return task
+
+
+def validate_init_data(init_data: str, bot_token: str | None = None) -> dict | None:
+    """Validate Telegram Web App initData (HMAC) and return the user dict.
+
+    Returns None when the signature is invalid or too old (>24h).
+    """
+    token = bot_token or config.TELEGRAM_BOT_TOKEN
+    if not token or not init_data:
+        return None
+    params = dict(urllib.parse.parse_qsl(init_data, keep_blank_values=True))
+    received_hash = params.pop("hash", None)
+    if not received_hash or not params:
+        return None
+    data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(params.items()))
+    secret_key = hmac.new(b"WebAppData", token.encode(), hashlib.sha256).digest()
+    computed = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(computed, received_hash):
+        return None
+    try:
+        if time.time() - int(params.get("auth_date", 0)) > 24 * 3600:
+            return None
+    except (TypeError, ValueError):
+        return None
+    try:
+        return json.loads(params["user"]) if "user" in params else {}
+    except (ValueError, KeyError):
+        return None
 
 
 def stop_on_loop(task) -> None:

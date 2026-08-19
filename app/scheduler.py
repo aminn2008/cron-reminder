@@ -67,7 +67,7 @@ def _send_telegram(chat_id: str, job: CronJob) -> None:
         raise RuntimeError("TELEGRAM_BOT_TOKEN is not set in .env")
     url = f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = json.dumps(
-        {"chat_id": chat_id, "text": f"⏰ {job.name}\n{job.message}"}
+        {"chat_id": chat_id, "text": f"⏰ {job.message or job.name}"}
     ).encode()
     req = urllib.request.Request(
         url, data=payload, headers={"Content-Type": "application/json"}
@@ -75,6 +75,12 @@ def _send_telegram(chat_id: str, job: CronJob) -> None:
     with urllib.request.urlopen(req, timeout=30) as resp:
         if resp.status != 200:
             raise RuntimeError(f"Telegram API status: {resp.status}")
+
+
+def _job_id(job) -> str:
+    """Stable scheduler id — based on the job's uid, not its numeric rowid."""
+    uid = getattr(job, "uid", None)
+    return f"job_{uid}" if uid else f"job_{job.id}"
 
 
 def execute_job(job_id: int) -> None:
@@ -150,20 +156,40 @@ def execute_job(job_id: int) -> None:
 
 
 def sync_jobs() -> None:
-    """Reload all enabled jobs from the database into the scheduler."""
+    """Reconcile the scheduler with the database.
+
+    - removes ANY job that points at our executor (whatever its id scheme),
+      so stale triggers for deleted jobs can never survive a sync;
+    - re-adds every enabled job from the DB;
+    - disables one-shot reminders whose run date has already passed
+      (they must not fire late after an outage/restart).
+    """
+    now = datetime.now(ZoneInfo("UTC"))
+    removed = 0
+    for job in scheduler.get_jobs():
+        func_ref = getattr(job, "func_ref", "") or ""
+        if job.id.startswith("job_") or func_ref.endswith("scheduler:execute_job"):
+            scheduler.remove_job(job.id)
+            removed += 1
+    log.info("sync_jobs: removed %d stale scheduler jobs", removed)
+
     db = SessionLocal()
     try:
-        for job in scheduler.get_jobs():
-            if job.id.startswith("job_"):
-                scheduler.remove_job(job.id)
-
         jobs = db.query(CronJob).filter(CronJob.enabled.is_(True)).all()
         for job in jobs:
             tz = ZoneInfo(job.timezone or "Asia/Tehran")
             try:
                 if job.send_once_at:
-                    aware = job.send_once_at.replace(tzinfo=ZoneInfo("UTC")).astimezone(tz)
-                    trigger = DateTrigger(run_date=aware)
+                    aware_utc = job.send_once_at.replace(tzinfo=ZoneInfo("UTC"))
+                    if aware_utc <= now:
+                        # stale one-shot: never fire it late, just turn it off
+                        job.enabled = False
+                        log.info(
+                            "job %s (%s): one-shot date %s already passed → disabled",
+                            job.id, job.name, aware_utc,
+                        )
+                        continue
+                    trigger = DateTrigger(run_date=aware_utc.astimezone(tz))
                 elif job.interval_minutes:
                     start = datetime.now(tz) + timedelta(minutes=job.interval_minutes)
                     trigger = IntervalTrigger(minutes=job.interval_minutes, start_date=start)
@@ -173,13 +199,14 @@ def sync_jobs() -> None:
                     execute_job,
                     trigger,
                     args=[job.id],
-                    id=f"job_{job.id}",
+                    id=_job_id(job),
                     replace_existing=True,
                     misfire_grace_time=60,
                 )
-                log.info("scheduled job %s", job.id)
+                log.info("scheduled job %s (%s)", job.id, job.name)
             except Exception as e:
                 log.error("invalid config for job %s: %s", job.id, e)
+        db.commit()
     finally:
         db.close()
 
