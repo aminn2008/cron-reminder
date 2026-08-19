@@ -16,6 +16,9 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(120), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(200))
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    bind_code: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    bind_code_expires: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    telegram_chat_id: Mapped[str | None] = mapped_column(String(50), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     jobs: Mapped[list[CronJob]] = relationship(

@@ -79,7 +79,7 @@ async function loadAll() {
     if (me.user.is_admin) document.getElementById('admin-link').classList.remove('hidden');
   } catch (e) {}
 
-  await Promise.all([loadJobs(), loadStats(), loadLogs(), loadTelegramStatus()]);
+  await Promise.all([loadJobs(), loadStats(), loadLogs(), loadTelegramStatus(), loadTelegramPanel()]);
 }
 
 /* ─── telegram ─── */
@@ -110,6 +110,60 @@ async function testTelegram() {
       body: JSON.stringify({ chat_id: chatId }),
     });
     toast('Test message sent to Telegram 📤', 'success');
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+/* ─── telegram bind panel ─── */
+async function loadTelegramPanel() {
+  const el = document.getElementById('tg-panel');
+  if (!el) return;
+  try {
+    const [status, bind] = await Promise.all([
+      api('/api/telegram/status'),
+      api('/api/telegram/bind-status'),
+    ]);
+    if (!status.configured) {
+      el.innerHTML = '<p class="hint">⚠️ Telegram bot is not configured.</p>';
+      return;
+    }
+    if (bind.bound) {
+      el.innerHTML = `
+        <p>✅ Linked to Telegram chat: <code>${esc(bind.chat_id)}</code></p>
+        <p class="hint">You can manage your reminders right from the Telegram chat — press
+        <b>📋 My reminders</b> there, or use commands like <code>/new 120 Drink water</code>,
+        <code>/once 2026-08-20 09:00 Meeting</code>, <code>/pause 1</code>, <code>/delete 1</code>.</p>
+        <button class="btn danger small" onclick="unbindTelegram()">🔗 Unlink chat</button>`;
+    } else {
+      el.innerHTML = `
+        <p><b>Step 1:</b> <button class="btn ghost small" onclick="getBindCode()">Get bind code</button></p>
+        <p class="hint" id="bind-code-box"></p>
+        <p class="hint"><b>Step 2:</b> In Telegram send <code>/bind CODE</code> to
+        <b>@${esc(status.bot_username || 'your bot')}</b></p>
+        <p class="hint"><b>Step 3:</b> Done! Now create reminders straight from the chat — with buttons! 🤖</p>`;
+    }
+  } catch (e) {
+    el.innerHTML = '<p class="hint">Could not load Telegram status.</p>';
+  }
+}
+
+async function getBindCode() {
+  try {
+    const r = await api('/api/telegram/bind-code', { method: 'POST' });
+    const box = document.getElementById('bind-code-box');
+    if (box) box.innerHTML = `Your code (valid ${r.expires_minutes} min): <code class="code-box">${esc(r.code)}</code>`;
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+async function unbindTelegram() {
+  if (!confirm('Unlink this Telegram chat from your account?')) return;
+  try {
+    await api('/api/telegram/unbind', { method: 'POST' });
+    toast('Telegram chat unlinked', 'success');
+    loadTelegramPanel();
   } catch (err) {
     toast(err.message, 'error');
   }

@@ -1,5 +1,6 @@
 """Cron Reminder — scheduled reminder service
-Full API: auth, interval/cron job management, run-now, logs and admin panel."""
+Full API: auth, interval/one-shot job management, run-now, logs, admin panel, Telegram."""
+import secrets
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -196,6 +197,34 @@ def telegram_test(
         return {"success": True}
     except Exception as e:
         raise HTTPException(400, f"Telegram error: {e}")
+
+
+@app.post("/api/telegram/bind-code")
+def telegram_bind_code(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Generates a 6-char code the user sends to the bot via /bind <code>."""
+    code = secrets.token_hex(3).upper()
+    user.bind_code = code
+    user.bind_code_expires = datetime.now(UTC).replace(tzinfo=None) + timedelta(minutes=10)
+    db.commit()
+    return {"code": code, "expires_minutes": 10}
+
+
+@app.get("/api/telegram/bind-status")
+def telegram_bind_status(user: User = Depends(get_current_user)):
+    return {"bound": bool(user.telegram_chat_id), "chat_id": user.telegram_chat_id}
+
+
+@app.post("/api/telegram/unbind")
+def telegram_unbind(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user.telegram_chat_id = None
+    db.commit()
+    return {"success": True}
 
 
 # ─────────────────────────── auth ───────────────────────────
