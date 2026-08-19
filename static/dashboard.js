@@ -10,6 +10,8 @@ function toMinutes(val, unit) {
 
 function humanizeInterval(m) {
   if (!m || m < 1) return '—';
+  const fa = getLang() === 'fa';
+  const num = (n) => (fa ? faNum(n) : String(n));
   let rem = m;
   const units = [
     [43200, 'month'], [10080, 'week'], [1440, 'day'], [60, 'hour'], [1, 'minute'],
@@ -18,11 +20,12 @@ function humanizeInterval(m) {
   for (const [mul, name] of units) {
     const n = Math.floor(rem / mul);
     if (n > 0) {
-      parts.push(`${n} ${name}${n > 1 ? 's' : ''}`);
+      parts.push(fa ? `${num(n)} ${t('unit.' + name)}` : `${num(n)} ${t('unit.' + name)}${n > 1 ? 's' : ''}`);
       rem -= n * mul;
     }
   }
-  return 'Every ' + (parts.join(' ') || '1 minute');
+  if (!parts.length) return t('min1');
+  return t('every.prefix') + parts.join(' ');
 }
 
 function decompose(m) {
@@ -90,10 +93,10 @@ async function loadTelegramStatus() {
     if (!el) return;
     if (s.configured) {
       el.textContent = s.bot_username
-        ? `🤖 Bot active: @${s.bot_username} — send it any message to get your chat ID`
-        : '🤖 Bot configured — send it any message to get your chat ID';
+        ? `${t('tg.botActive')} @${s.bot_username} ${t('tg.sendToGetChatId')}`
+        : t('tg.botConfigured');
     } else {
-      el.textContent = '⚠️ Telegram not configured — add TELEGRAM_BOT_TOKEN to .env';
+      el.textContent = t('tg.notConfigured');
     }
   } catch (e) {}
 }
@@ -101,7 +104,7 @@ async function loadTelegramStatus() {
 async function testTelegram() {
   const chatId = document.getElementById('f-chat').value.trim();
   if (!chatId) {
-    toast('Enter a Telegram chat ID first', 'error');
+    toast(t('tg.enterChatId'), 'error');
     return;
   }
   try {
@@ -109,7 +112,7 @@ async function testTelegram() {
       method: 'POST',
       body: JSON.stringify({ chat_id: chatId }),
     });
-    toast('Test message sent to Telegram 📤', 'success');
+    toast(t('tg.testSent'), 'success');
   } catch (err) {
     toast(err.message, 'error');
   }
@@ -125,26 +128,23 @@ async function loadTelegramPanel() {
       api('/api/telegram/bind-status'),
     ]);
     if (!status.configured) {
-      el.innerHTML = '<p class="hint">⚠️ Telegram bot is not configured.</p>';
+      el.innerHTML = `<p class="hint">${t('tg.notConfigured')}</p>`;
       return;
     }
     if (bind.bound) {
       el.innerHTML = `
-        <p>✅ Linked to Telegram chat: <code>${esc(bind.chat_id)}</code></p>
-        <p class="hint">You can manage your reminders right from the Telegram chat — press
-        <b>📋 My reminders</b> there, or use commands like <code>/new 120 Drink water</code>,
-        <code>/once 2026-08-20 09:00 Meeting</code>, <code>/pause 1</code>, <code>/delete 1</code>.</p>
-        <button class="btn danger small" onclick="unbindTelegram()">🔗 Unlink chat</button>`;
+        <p>${t('tg.linkedTo')} <code>${esc(bind.chat_id)}</code></p>
+        <p class="hint">${t('tg.manageHint')}</p>
+        <button class="btn danger small" onclick="unbindTelegram()">${t('tg.unlink')}</button>`;
     } else {
       el.innerHTML = `
-        <p><b>Step 1:</b> <button class="btn ghost small" onclick="getBindCode()">Get bind code</button></p>
+        <p>${t('tg.step1')} <button class="btn ghost small" onclick="getBindCode()">${t('tg.getBindCode')}</button></p>
         <p class="hint" id="bind-code-box"></p>
-        <p class="hint"><b>Step 2:</b> In Telegram send <code>/bind CODE</code> to
-        <b>@${esc(status.bot_username || 'your bot')}</b></p>
-        <p class="hint"><b>Step 3:</b> Done! Now create reminders straight from the chat — with buttons! 🤖</p>`;
+        <p class="hint">${t('tg.step2')} <b>@${esc(status.bot_username || 'your bot')}</b></p>
+        <p class="hint">${t('tg.step3')}</p>`;
     }
   } catch (e) {
-    el.innerHTML = '<p class="hint">Could not load Telegram status.</p>';
+    el.innerHTML = `<p class="hint">${t('tg.loadFailed')}</p>`;
   }
 }
 
@@ -152,17 +152,17 @@ async function getBindCode() {
   try {
     const r = await api('/api/telegram/bind-code', { method: 'POST' });
     const box = document.getElementById('bind-code-box');
-    if (box) box.innerHTML = `Your code (valid ${r.expires_minutes} min): <code class="code-box">${esc(r.code)}</code>`;
+    if (box) box.innerHTML = `${tWith('tg.bindCodeMsg', { n: r.expires_minutes })} <code class="code-box">${esc(r.code)}</code>`;
   } catch (err) {
     toast(err.message, 'error');
   }
 }
 
 async function unbindTelegram() {
-  if (!confirm('Unlink this Telegram chat from your account?')) return;
+  if (!confirm(t('confirm.unbind'))) return;
   try {
     await api('/api/telegram/unbind', { method: 'POST' });
-    toast('Telegram chat unlinked', 'success');
+    toast(t('tg.unlinked'), 'success');
     loadTelegramPanel();
   } catch (err) {
     toast(err.message, 'error');
@@ -174,7 +174,7 @@ async function loadJobs() {
   jobs = data.jobs;
   const body = document.getElementById('jobs-body');
   if (!jobs.length) {
-    body.innerHTML = '<tr><td colspan="6" class="empty">No reminders yet — create your first one! 🚀</td></tr>';
+    body.innerHTML = `<tr><td colspan="6" class="empty">${t('dash.emptyJobs')}</td></tr>`;
     return;
   }
   body.innerHTML = jobs.map((j) => `
@@ -182,13 +182,13 @@ async function loadJobs() {
       <td><b>${esc(j.name)}</b></td>
       <td><span class="badge ${j.type === 'once' ? 'blue' : 'violet'}">${j.type === 'once' ? '🔔' : '🔄'} ${esc(j.interval_label || '—')}</span></td>
       <td>${fmtChannels(j)}</td>
-      <td>${j.next_run ? esc(j.next_run) : '<span class="badge gray">Disabled</span>'}</td>
-      <td>${j.enabled ? '<span class="badge green">Active</span>' : '<span class="badge gray">Paused</span>'}</td>
+      <td>${j.next_run ? esc(j.next_run) : `<span class="badge gray">${t('status.disabled')}</span>`}</td>
+      <td>${j.enabled ? `<span class="badge green">${t('status.active')}</span>` : `<span class="badge gray">${t('status.paused')}</span>`}</td>
       <td><div class="actions">
-        <button class="btn ghost small" onclick="runNow(${j.id})" title="Run now">▶️</button>
-        <button class="btn ghost small" onclick="toggleJob(${j.id})" title="Pause / resume">${j.enabled ? '⏸️' : '▶️'}</button>
-        <button class="btn ghost small" onclick="editJob(${j.id})" title="Edit">✏️</button>
-        <button class="btn danger small" onclick="deleteJob(${j.id})" title="Delete">🗑️</button>
+        <button class="btn ghost small" onclick="runNow(${j.id})" title="${t('action.runNow')}">▶️</button>
+        <button class="btn ghost small" onclick="toggleJob(${j.id})" title="${t('action.pauseResume')}">${j.enabled ? '⏸️' : '▶️'}</button>
+        <button class="btn ghost small" onclick="editJob(${j.id})" title="${t('action.edit')}">✏️</button>
+        <button class="btn danger small" onclick="deleteJob(${j.id})" title="${t('action.delete')}">🗑️</button>
       </div></td>
     </tr>`).join('');
 }
@@ -196,24 +196,24 @@ async function loadJobs() {
 async function loadStats() {
   const s = await api('/api/stats');
   document.getElementById('stats').innerHTML = `
-    <div class="stat-card blue"><div class="icon">📋</div><div class="num">${s.total}</div><div class="lbl">Total reminders</div></div>
-    <div class="stat-card violet"><div class="icon">⚡</div><div class="num">${s.enabled}</div><div class="lbl">Active</div></div>
-    <div class="stat-card green"><div class="icon">📧</div><div class="num">${s.success}</div><div class="lbl">Sent successfully</div></div>
-    <div class="stat-card red"><div class="icon">⚠️</div><div class="num">${s.failed}</div><div class="lbl">Failed</div></div>`;
+    <div class="stat-card blue"><div class="icon">📋</div><div class="num">${s.total}</div><div class="lbl">${t('stats.total')}</div></div>
+    <div class="stat-card violet"><div class="icon">⚡</div><div class="num">${s.enabled}</div><div class="lbl">${t('stats.active')}</div></div>
+    <div class="stat-card green"><div class="icon">📧</div><div class="num">${s.success}</div><div class="lbl">${t('stats.sent')}</div></div>
+    <div class="stat-card red"><div class="icon">⚠️</div><div class="num">${s.failed}</div><div class="lbl">${t('stats.failed')}</div></div>`;
 }
 
 async function loadLogs() {
   const data = await api('/api/logs?limit=30');
   const body = document.getElementById('logs-body');
   if (!data.logs.length) {
-    body.innerHTML = '<tr><td colspan="5" class="empty">No logs yet</td></tr>';
+    body.innerHTML = `<tr><td colspan="5" class="empty">${t('common.noLogs')}</td></tr>`;
     return;
   }
   body.innerHTML = data.logs.map((l) => `
     <tr>
       <td>${esc(l.executed_at)}</td>
       <td>${esc(l.job_name)}</td>
-      <td>${l.channel === 'email' ? '📧 Email' : '📱 Telegram'}</td>
+      <td>${l.channel === 'email' ? t('channel.email') : t('channel.telegram')}</td>
       <td>${badge(l.status)}</td>
       <td style="font-size:12px;color:var(--text-dim)">${esc(l.detail)}</td>
     </tr>`).join('');
@@ -223,7 +223,7 @@ async function loadLogs() {
 async function runNow(id) {
   try {
     await api(`/api/jobs/${id}/run-now`, { method: 'POST' });
-    toast('Test run executed — check the logs 📋', 'success');
+    toast(t('runNow.toast'), 'success');
     await Promise.all([loadLogs(), loadStats()]);
   } catch (e) { toast(e.message, 'error'); }
 }
@@ -236,27 +236,27 @@ async function toggleJob(id) {
 }
 
 async function deleteJob(id) {
-  if (!confirm('Delete this reminder?')) return;
+  if (!confirm(t('confirm.deleteJob'))) return;
   try {
     await api(`/api/jobs/${id}`, { method: 'DELETE' });
-    toast('Reminder deleted', 'success');
+    toast(t('job.deleted'), 'success');
   } catch (e) {
-    toast(e.message, 'error');  
+    toast(e.message, 'error');
   }
   await Promise.all([loadJobs(), loadStats()]);
 }
 
 
 function openModal(job) {
-  document.getElementById('modal-title').textContent = job ? 'Edit reminder' : 'New reminder';
+  document.getElementById('modal-title').textContent = job ? t('modal.edit') : t('modal.new');
   document.getElementById('f-id').value = job ? job.id : '';
   document.getElementById('f-name').value = job ? job.name : '';
   document.getElementById('f-message').value = job ? job.message : '';
 
   
   const emailHint = document.getElementById('f-email-default');
-  emailHint.textContent = currentUserEmail ? 'Default: ' + currentUserEmail : '';
-  document.getElementById('f-email').placeholder = currentUserEmail || 'Email address';
+  emailHint.textContent = currentUserEmail ? t('modal.defaultEmail') + ' ' + currentUserEmail : '';
+  document.getElementById('f-email').placeholder = currentUserEmail || t('modal.emailPh');
   document.getElementById('f-email').value = job ? (job.email_to || currentUserEmail || '') : (currentUserEmail || '');
 
   document.getElementById('f-chat').value = job ? (job.telegram_chat_id || '') : '';
@@ -325,10 +325,10 @@ async function saveJob(e) {
   try {
     if (id) {
       await api(`/api/jobs/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
-      toast('Reminder updated ✅', 'success');
+      toast(t('job.updated'), 'success');
     } else {
       await api('/api/jobs', { method: 'POST', body: JSON.stringify(payload) });
-      toast('Reminder created 🎉', 'success');
+      toast(t('job.created'), 'success');
     }
     closeModal();
     await Promise.all([loadJobs(), loadStats()]);
@@ -339,6 +339,15 @@ async function saveJob(e) {
 
 loadAll();
 
+
+window.addEventListener('langchange', () => {
+  loadJobs().catch(() => {});
+  loadStats().catch(() => {});
+  loadLogs().catch(() => {});
+  loadTelegramStatus().catch(() => {});
+  loadTelegramPanel().catch(() => {});
+  updateConversion();
+});
 
 setInterval(() => {
   loadJobs().catch(() => {});

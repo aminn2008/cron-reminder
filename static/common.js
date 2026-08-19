@@ -1,4 +1,3 @@
-
 async function api(path, opts = {}) {
   const res = await fetch(path, {
     headers: { 'Content-Type': 'application/json' },
@@ -10,7 +9,7 @@ async function api(path, opts = {}) {
     throw new Error('unauthorized');
   }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.detail || 'Server error');
+  if (!res.ok) throw new Error(data.detail || t('err.server'));
   return data;
 }
 
@@ -31,9 +30,9 @@ function esc(s) {
 
 function badge(status) {
   const map = {
-    success: ['green', '✓ Success'],
-    failed: ['red', '✗ Failed'],
-    skipped: ['gray', '— Skipped'],
+    success: ['green', t('badge.success')],
+    failed: ['red', t('badge.failed')],
+    skipped: ['gray', t('badge.skipped')],
   };
   const [cls, label] = map[status] || ['gray', status];
   return `<span class="badge ${cls}">${label}</span>`;
@@ -41,8 +40,8 @@ function badge(status) {
 
 function fmtChannels(job) {
   const parts = [];
-  if (job.email_to) parts.push('<span class="badge blue">📧 Email</span>');
-  if (job.telegram_chat_id) parts.push('<span class="badge amber">📱 Telegram</span>');
+  if (job.email_to) parts.push(`<span class="badge blue">${t('channel.email')}</span>`);
+  if (job.telegram_chat_id) parts.push(`<span class="badge amber">${t('channel.telegram')}</span>`);
   return parts.join(' ') || '<span class="badge gray">—</span>';
 }
 

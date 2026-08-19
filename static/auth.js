@@ -32,7 +32,7 @@ async function doRegister(e) {
         password: document.getElementById('reg-password').value,
       }),
     });
-    toast('Registration successful! Welcome 🎉', 'success');
+    toast(t('auth.regSuccess'), 'success');
     setTimeout(() => (location.href = '/dashboard'), 600);
   } catch (err) {
     toast(err.message, 'error');
@@ -60,7 +60,7 @@ async function tryTelegramWebApp() {
       location.href = '/dashboard';
       return true;
     }
-    toast(data.detail || 'Telegram login failed', 'error');
+    toast(data.detail || t('auth.telegramLoginFailed'), 'error');
   } catch (e) {}
   return false;
 }

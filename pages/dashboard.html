@@ -11,57 +11,58 @@
   <header class="topbar">
     <div class="brand">⏰ Cron Reminder</div>
     <nav>
-      <a href="/dashboard" class="active">Dashboard</a>
-      <a href="/admin" id="admin-link" class="hidden">Admin panel</a>
+      <a href="/dashboard" class="active" data-i18n="nav.dashboard">Dashboard</a>
+      <a href="/admin" id="admin-link" class="hidden" data-i18n="nav.admin">Admin panel</a>
       <span id="user-chip" class="chip"></span>
-      <button class="btn ghost small" onclick="logout()">Log out</button>
+      <button id="lang-toggle" class="btn ghost small"></button>
+      <button class="btn ghost small" data-i18n="nav.logout" onclick="logout()">Log out</button>
     </nav>
   </header>
 
   <main class="container">
     <div class="page-head">
-      <h1>Dashboard</h1>
-      <p>Manage your scheduled reminders</p>
+      <h1 data-i18n="dash.title">Dashboard</h1>
+      <p data-i18n="dash.subtitle">Manage your scheduled reminders</p>
     </div>
     <section class="stats" id="stats"></section>
 
     <section class="card">
       <div class="card-head">
-        <h2>📱 Telegram Bot</h2>
-        <button class="btn ghost small" onclick="loadTelegramPanel()">🔄 Refresh</button>
+        <h2 data-i18n="dash.tgCard">📱 Telegram Bot</h2>
+        <button class="btn ghost small" data-i18n="dash.refresh" onclick="loadTelegramPanel()">🔄 Refresh</button>
       </div>
-      <div id="tg-panel" class="tg-panel">Loading...</div>
+      <div id="tg-panel" class="tg-panel" data-i18n="common.loading">Loading...</div>
     </section>
 
     <section class="card">
       <div class="card-head">
-        <h2>📋 My Reminders</h2>
-        <button class="btn primary" onclick="openModal()">+ New reminder</button>
+        <h2 data-i18n="dash.myReminders">📋 My Reminders</h2>
+        <button class="btn primary" data-i18n="dash.newReminder" onclick="openModal()">+ New reminder</button>
       </div>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>Name</th><th>Interval</th><th>Channels</th>
-              <th>Next run</th><th>Status</th><th>Actions</th>
+              <th data-i18n="th.name">Name</th><th data-i18n="th.interval">Interval</th><th data-i18n="th.channels">Channels</th>
+              <th data-i18n="th.nextRun">Next run</th><th data-i18n="th.status">Status</th><th data-i18n="th.actions">Actions</th>
             </tr>
           </thead>
           <tbody id="jobs-body">
-            <tr><td colspan="6" class="empty">Loading...</td></tr>
+            <tr><td colspan="6" class="empty" data-i18n="common.loading">Loading...</td></tr>
           </tbody>
         </table>
       </div>
     </section>
 
     <section class="card">
-      <div class="card-head"><h2>📄 Execution Logs</h2></div>
+      <div class="card-head"><h2 data-i18n="dash.logsCard">📄 Execution Logs</h2></div>
       <div class="table-wrap">
         <table>
           <thead>
-            <tr><th>Time</th><th>Reminder</th><th>Channel</th><th>Status</th><th>Details</th></tr>
+            <tr><th data-i18n="th.time">Time</th><th data-i18n="th.reminder">Reminder</th><th data-i18n="th.channels">Channel</th><th data-i18n="th.status">Status</th><th data-i18n="th.details">Details</th></tr>
           </thead>
           <tbody id="logs-body">
-            <tr><td colspan="5" class="empty">No logs yet</td></tr>
+            <tr><td colspan="5" class="empty" data-i18n="common.noLogs">No logs yet</td></tr>
           </tbody>
         </table>
       </div>
@@ -71,75 +72,76 @@
   
   <div class="modal-overlay hidden" id="modal">
     <div class="modal">
-      <h3 id="modal-title">New reminder</h3>
+      <h3 id="modal-title" data-i18n="modal.new">New reminder</h3>
       <form onsubmit="saveJob(event)">
         <input type="hidden" id="f-id">
 
-        <label>Reminder name *</label>
-        <input type="text" id="f-name" placeholder="e.g. Drink water" required>
+        <label data-i18n="modal.name">Reminder name *</label>
+        <input type="text" id="f-name" data-i18n-ph="modal.namePh" placeholder="e.g. Drink water" required>
 
-        <label>Message</label>
-        <textarea id="f-message" rows="2" placeholder="Reminder message..."></textarea>
+        <label data-i18n="modal.message">Message</label>
+        <textarea id="f-message" rows="2" data-i18n-ph="modal.messagePh" placeholder="Reminder message..."></textarea>
 
-        <label>Schedule *</label>
+        <label data-i18n="modal.schedule">Schedule *</label>
         <div class="seg">
-          <button type="button" class="seg-btn active" id="mode-repeat" onclick="setMode('repeat')">🔄 Repeat</button>
-          <button type="button" class="seg-btn" id="mode-once" onclick="setMode('once')">🔔 Send once</button>
+          <button type="button" class="seg-btn active" id="mode-repeat" data-i18n="modal.repeat" onclick="setMode('repeat')">🔄 Repeat</button>
+          <button type="button" class="seg-btn" id="mode-once" data-i18n="modal.once" onclick="setMode('once')">🔔 Send once</button>
         </div>
 
         <div id="repeat-section">
-          <label>Repeat every</label>
+          <label data-i18n="modal.repeatEvery">Repeat every</label>
           <div class="presets" id="f-presets">
-            <button type="button" class="preset" data-m="1">1 min</button>
-            <button type="button" class="preset" data-m="30">30 min</button>
-            <button type="button" class="preset" data-m="60">1 hour</button>
-            <button type="button" class="preset" data-m="120">2 hours</button>
-            <button type="button" class="preset" data-m="1440">1 day</button>
-            <button type="button" class="preset" data-m="10080">1 week</button>
-            <button type="button" class="preset" data-m="43200">1 month</button>
+            <button type="button" class="preset" data-m="1" data-i18n="preset.1m">1 min</button>
+            <button type="button" class="preset" data-m="30" data-i18n="preset.30m">30 min</button>
+            <button type="button" class="preset" data-m="60" data-i18n="preset.1h">1 hour</button>
+            <button type="button" class="preset" data-m="120" data-i18n="preset.2h">2 hours</button>
+            <button type="button" class="preset" data-m="1440" data-i18n="preset.1d">1 day</button>
+            <button type="button" class="preset" data-m="10080" data-i18n="preset.1w">1 week</button>
+            <button type="button" class="preset" data-m="43200" data-i18n="preset.1M">1 month</button>
           </div>
           <div class="interval-row">
             <input type="number" id="f-interval" min="1" value="60" required>
             <select id="f-unit">
-              <option value="minutes" selected>minutes</option>
-              <option value="hours">hours</option>
-              <option value="days">days</option>
-              <option value="weeks">weeks</option>
-              <option value="months">months</option>
+              <option value="minutes" selected data-i18n="unit.minutes">minutes</option>
+              <option value="hours" data-i18n="unit.hours">hours</option>
+              <option value="days" data-i18n="unit.days">days</option>
+              <option value="weeks" data-i18n="unit.weeks">weeks</option>
+              <option value="months" data-i18n="unit.months">months</option>
             </select>
           </div>
-          <p class="hint" id="f-conv">= Every 1 hour</p>
-          <p class="hint">💡 Type minutes directly — e.g. 120 → every 2 hours</p>
+          <p class="hint" id="f-conv" data-i18n="conv.example">= Every 1 hour</p>
+          <p class="hint" data-i18n="hint.directMinutes">💡 Type minutes directly — e.g. 120 → every 2 hours</p>
         </div>
 
         <div id="once-section" class="hidden">
-          <label>Send at</label>
+          <label data-i18n="modal.sendAt">Send at</label>
           <input type="datetime-local" id="f-once-at">
-          <p class="hint">The reminder fires once at this time, then turns itself off.</p>
+          <p class="hint" data-i18n="modal.onceHint">The reminder fires once at this time, then turns itself off.</p>
         </div>
 
-        <label>Delivery channels</label>
-        <input type="email" id="f-email" placeholder="Email address (defaults to your account email)">
+        <label data-i18n="modal.channels">Delivery channels</label>
+        <input type="email" id="f-email" data-i18n-ph="modal.emailPh" placeholder="Email address (defaults to your account email)">
         <p class="hint" id="f-email-default"></p>
 
-        <label>Telegram chat ID (optional)</label>
-        <input type="text" id="f-chat" placeholder="e.g. 123456789" dir="ltr">
+        <label data-i18n="modal.chatId">Telegram chat ID (optional)</label>
+        <input type="text" id="f-chat" data-i18n-ph="modal.chatPh" placeholder="e.g. 123456789" dir="ltr">
         <div id="tg-help">
-          <p class="hint" id="tg-status">Checking Telegram bot status...</p>
-          <button type="button" class="btn ghost small" id="tg-test-btn" onclick="testTelegram()">📤 Test Telegram</button>
+          <p class="hint" id="tg-status" data-i18n="tg.checking">Checking Telegram bot status...</p>
+          <button type="button" class="btn ghost small" id="tg-test-btn" data-i18n="tg.testBtn" onclick="testTelegram()">📤 Test Telegram</button>
         </div>
 
-        <label class="checkline"><input type="checkbox" id="f-enabled" checked> Active</label>
+        <label class="checkline"><input type="checkbox" id="f-enabled" checked> <span data-i18n="modal.active">Active</span></label>
 
         <div class="modal-actions">
-          <button type="button" class="btn ghost" onclick="closeModal()">Cancel</button>
-          <button type="submit" class="btn primary">Save</button>
+          <button type="button" class="btn ghost" data-i18n="action.cancel" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn primary" data-i18n="action.save">Save</button>
         </div>
       </form>
     </div>
   </div>
 
   <div id="toasts"></div>
+  <script src="/static/i18n.js"></script>
   <script src="/static/common.js"></script>
   <script src="/static/dashboard.js"></script>
 </body>

@@ -424,3 +424,20 @@ code.cron {
   .container { padding: 0 12px; }
   .stat-card .num { font-size: 24px; }
 }
+
+.lang-toggle {
+  position: fixed;
+  top: 14px;
+  inset-inline-end: 14px;
+  z-index: 60;
+}
+
+[dir="rtl"] th,
+[dir="rtl"] td {
+  text-align: right;
+}
+
+[dir="rtl"] .toast {
+  left: auto;
+  right: 22px;
+}

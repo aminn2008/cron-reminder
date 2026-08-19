@@ -8,30 +8,32 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body class="auth-body">
+  <button id="lang-toggle" class="btn ghost small lang-toggle"></button>
   <div class="auth-card">
     <div class="logo">⏰</div>
     <h1>Cron Reminder</h1>
-    <p class="subtitle">Scheduled reminder service</p>
+    <p class="subtitle" data-i18n="app.subtitle">Scheduled reminder service</p>
 
     <div class="tabs">
-      <button class="tab active" id="tab-login" onclick="switchTab('login')">Login</button>
-      <button class="tab" id="tab-register" onclick="switchTab('register')">Sign up</button>
+      <button class="tab active" id="tab-login" data-i18n="auth.loginTab" onclick="switchTab('login')">Login</button>
+      <button class="tab" id="tab-register" data-i18n="auth.registerTab" onclick="switchTab('register')">Sign up</button>
     </div>
 
     <form id="login-form" onsubmit="doLogin(event)">
-      <input type="text" id="login-username" placeholder="Username" required>
-      <input type="password" id="login-password" placeholder="Password" required>
-      <button type="submit" class="btn primary block">Log in</button>
+      <input type="text" id="login-username" data-i18n-ph="auth.username" placeholder="Username" required>
+      <input type="password" id="login-password" data-i18n-ph="auth.password" placeholder="Password" required>
+      <button type="submit" class="btn primary block" data-i18n="auth.loginBtn">Log in</button>
     </form>
 
     <form id="register-form" class="hidden" onsubmit="doRegister(event)">
-      <input type="text" id="reg-username" placeholder="Username" required>
-      <input type="email" id="reg-email" placeholder="Email" required>
-      <input type="password" id="reg-password" placeholder="Password (min 6 characters)" required>
-      <button type="submit" class="btn primary block">Sign up</button>
+      <input type="text" id="reg-username" data-i18n-ph="auth.username" placeholder="Username" required>
+      <input type="email" id="reg-email" data-i18n-ph="auth.email" placeholder="Email" required>
+      <input type="password" id="reg-password" data-i18n-ph="auth.passwordHint" placeholder="Password (min 6 characters)" required>
+      <button type="submit" class="btn primary block" data-i18n="auth.registerBtn">Sign up</button>
     </form>
   </div>
   <div id="toasts"></div>
+  <script src="/static/i18n.js"></script>
   <script src="/static/common.js"></script>
   <script src="/static/auth.js"></script>
 </body>

@@ -11,26 +11,27 @@
   <header class="topbar">
     <div class="brand">⏰ Cron Reminder</div>
     <nav>
-      <a href="/dashboard">Dashboard</a>
-      <a href="/admin" class="active">Admin panel</a>
+      <a href="/dashboard" data-i18n="nav.dashboard">Dashboard</a>
+      <a href="/admin" class="active" data-i18n="nav.admin">Admin panel</a>
       <span id="user-chip" class="chip"></span>
-      <button class="btn ghost small" onclick="logout()">Log out</button>
+      <button id="lang-toggle" class="btn ghost small"></button>
+      <button class="btn ghost small" data-i18n="nav.logout" onclick="logout()">Log out</button>
     </nav>
   </header>
 
   <main class="container">
     <div class="page-head">
-      <h1>Admin Panel</h1>
-      <p>System overview — users, reminders and logs</p>
+      <h1 data-i18n="admin.title">Admin Panel</h1>
+      <p data-i18n="admin.subtitle">System overview — users, reminders and logs</p>
     </div>
     <section class="stats" id="stats"></section>
 
     <section class="card">
-      <div class="card-head"><h2>👥 Users</h2></div>
+      <div class="card-head"><h2 data-i18n="admin.users">👥 Users</h2></div>
       <div class="table-wrap">
         <table>
           <thead>
-            <tr><th>#</th><th>Username</th><th>Email</th><th>Reminders</th><th>Role</th></tr>
+            <tr><th>#</th><th data-i18n="th.name">Username</th><th data-i18n="auth.email">Email</th><th data-i18n="th.reminder">Reminders</th><th data-i18n="th.role">Role</th></tr>
           </thead>
           <tbody id="users-body"></tbody>
         </table>
@@ -38,11 +39,11 @@
     </section>
 
     <section class="card">
-      <div class="card-head"><h2>📋 All Reminders</h2></div>
+      <div class="card-head"><h2 data-i18n="admin.allReminders">📋 All Reminders</h2></div>
       <div class="table-wrap">
         <table>
           <thead>
-            <tr><th>#</th><th>Name</th><th>User</th><th>Interval</th><th>Channels</th><th>Status</th></tr>
+            <tr><th>#</th><th data-i18n="th.name">Name</th><th data-i18n="th.user">User</th><th data-i18n="th.interval">Interval</th><th data-i18n="th.channels">Channels</th><th data-i18n="th.status">Status</th></tr>
           </thead>
           <tbody id="jobs-body"></tbody>
         </table>
@@ -50,11 +51,11 @@
     </section>
 
     <section class="card">
-      <div class="card-head"><h2>📄 Recent Logs</h2></div>
+      <div class="card-head"><h2 data-i18n="admin.recentLogs">📄 Recent Logs</h2></div>
       <div class="table-wrap">
         <table>
           <thead>
-            <tr><th>Time</th><th>User</th><th>Reminder</th><th>Channel</th><th>Status</th><th>Details</th></tr>
+            <tr><th data-i18n="th.time">Time</th><th data-i18n="th.user">User</th><th data-i18n="th.reminder">Reminder</th><th data-i18n="th.channels">Channel</th><th data-i18n="th.status">Status</th><th data-i18n="th.details">Details</th></tr>
           </thead>
           <tbody id="logs-body"></tbody>
         </table>
@@ -63,6 +64,7 @@
   </main>
 
   <div id="toasts"></div>
+  <script src="/static/i18n.js"></script>
   <script src="/static/common.js"></script>
   <script src="/static/admin.js"></script>
 </body>
