@@ -22,6 +22,7 @@ from app.auth import (
 )
 from app.database import Base, engine, get_db
 from app.models import AuthSession, CronJob, JobLog, User
+from app import telegram_bot
 from app.scheduler import (
     execute_job,
     humanize_interval,
@@ -42,7 +43,9 @@ STATIC = ROOT / "static"
 async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
     start()
+    telegram_bot.start()
     yield
+    telegram_bot.stop()
     shutdown()
 
 
@@ -159,6 +162,40 @@ def admin():
 def health():
     from app.scheduler import scheduler
     return {"status": "ok", "scheduler_running": scheduler.running}
+
+
+# ─────────────────────────── telegram ───────────────────────────
+
+@app.get("/api/telegram/status")
+def telegram_status(user: User = Depends(get_current_user)):
+    if not config.TELEGRAM_BOT_TOKEN:
+        return {"configured": False, "bot_username": None}
+    me = telegram_bot.get_me()
+    return {
+        "configured": True,
+        "bot_username": me.get("username") if me else None,
+    }
+
+
+class TelegramTestBody(BaseModel):
+    chat_id: str
+
+
+@app.post("/api/telegram/test")
+def telegram_test(
+    body: TelegramTestBody,
+    user: User = Depends(get_current_user),
+):
+    if not body.chat_id.strip():
+        raise HTTPException(400, "Enter a Telegram chat ID first")
+    try:
+        telegram_bot.send_message(
+            body.chat_id.strip(),
+            "✅ Cron Reminder test message — Telegram delivery works!",
+        )
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(400, f"Telegram error: {e}")
 
 
 # ─────────────────────────── auth ───────────────────────────

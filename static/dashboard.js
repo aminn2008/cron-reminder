@@ -79,7 +79,40 @@ async function loadAll() {
     if (me.user.is_admin) document.getElementById('admin-link').classList.remove('hidden');
   } catch (e) {}
 
-  await Promise.all([loadJobs(), loadStats(), loadLogs()]);
+  await Promise.all([loadJobs(), loadStats(), loadLogs(), loadTelegramStatus()]);
+}
+
+/* ─── telegram ─── */
+async function loadTelegramStatus() {
+  try {
+    const s = await api('/api/telegram/status');
+    const el = document.getElementById('tg-status');
+    if (!el) return;
+    if (s.configured) {
+      el.textContent = s.bot_username
+        ? `🤖 Bot active: @${s.bot_username} — send it any message to get your chat ID`
+        : '🤖 Bot configured — send it any message to get your chat ID';
+    } else {
+      el.textContent = '⚠️ Telegram not configured — add TELEGRAM_BOT_TOKEN to .env';
+    }
+  } catch (e) {}
+}
+
+async function testTelegram() {
+  const chatId = document.getElementById('f-chat').value.trim();
+  if (!chatId) {
+    toast('Enter a Telegram chat ID first', 'error');
+    return;
+  }
+  try {
+    await api('/api/telegram/test', {
+      method: 'POST',
+      body: JSON.stringify({ chat_id: chatId }),
+    });
+    toast('Test message sent to Telegram 📤', 'success');
+  } catch (err) {
+    toast(err.message, 'error');
+  }
 }
 
 async function loadJobs() {

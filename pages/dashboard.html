@@ -115,7 +115,11 @@
         <p class="hint" id="f-email-default"></p>
 
         <label>Telegram chat ID (optional)</label>
-        <input type="text" id="f-chat" placeholder="e.g. 123456789">
+        <input type="text" id="f-chat" placeholder="e.g. 123456789" dir="ltr">
+        <div id="tg-help">
+          <p class="hint" id="tg-status">Checking Telegram bot status...</p>
+          <button type="button" class="btn ghost small" id="tg-test-btn" onclick="testTelegram()">📤 Test Telegram</button>
+        </div>
 
         <label class="checkline"><input type="checkbox" id="f-enabled" checked> Active</label>
 
