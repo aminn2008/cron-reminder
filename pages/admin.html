@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin Panel | Cron Reminder</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">⏰ Cron Reminder</div>
+    <nav>
+      <a href="/dashboard">Dashboard</a>
+      <a href="/admin" class="active">Admin panel</a>
+      <span id="user-chip" class="chip"></span>
+      <button class="btn ghost small" onclick="logout()">Log out</button>
+    </nav>
+  </header>
+
+  <main class="container">
+    <div class="page-head">
+      <h1>Admin Panel</h1>
+      <p>System overview — users, reminders and logs</p>
+    </div>
+    <section class="stats" id="stats"></section>
+
+    <section class="card">
+      <div class="card-head"><h2>👥 Users</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>#</th><th>Username</th><th>Email</th><th>Reminders</th><th>Role</th></tr>
+          </thead>
+          <tbody id="users-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>📋 All Reminders</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>#</th><th>Name</th><th>User</th><th>Interval</th><th>Channels</th><th>Status</th></tr>
+          </thead>
+          <tbody id="jobs-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>📄 Recent Logs</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Time</th><th>User</th><th>Reminder</th><th>Channel</th><th>Status</th><th>Details</th></tr>
+          </thead>
+          <tbody id="logs-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <div id="toasts"></div>
+  <script src="/static/common.js"></script>
+  <script src="/static/admin.js"></script>
+</body>
+</html>
