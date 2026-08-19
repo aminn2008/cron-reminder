@@ -70,17 +70,17 @@ def get_current_user(
 ) -> User:
     token = request.cookies.get("session")
     if not token:
-        raise HTTPException(401, "لطفاً ابتدا وارد شوید")
+        raise HTTPException(401, "Please log in first")
     sess = db.query(AuthSession).filter(AuthSession.token == token).first()
     if not sess:
-        raise HTTPException(401, "نشست نامعتبر است")
+        raise HTTPException(401, "Invalid session")
     user = db.get(User, sess.user_id)
     if not user:
-        raise HTTPException(401, "کاربر یافت نشد")
+        raise HTTPException(401, "User not found")
     return user
 
 
 def require_admin(user: User = Depends(get_current_user)) -> User:
     if not user.is_admin:
-        raise HTTPException(403, "دسترسی ادمین لازم است")
+        raise HTTPException(403, "Admin access required")
     return user
