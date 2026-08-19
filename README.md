@@ -4,6 +4,8 @@ A full-stack scheduled reminder service: users create **repeating** or **one-sho
 
 **Live:** http://meow.bahari.tr
 
+**🌐 [فارسی](README.fa.md)**
+
 ---
 
 ## ✨ Features
