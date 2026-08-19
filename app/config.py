@@ -20,6 +20,9 @@ APP_URL = os.getenv("APP_URL", "https://meow.bahari.tr")
 
 DEFAULT_TZ = os.getenv("TZ", "Asia/Tehran")
 
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "").strip()
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
+
 
 def smtp_ready() -> bool:
     return bool(SMTP_USER and SMTP_PASSWORD)

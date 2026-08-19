@@ -205,3 +205,31 @@ def test_humanize_interval():
     assert humanize_interval(10080) == "Every 1 week"
     assert humanize_interval(43200) == "Every 1 month"
     assert humanize_interval(None) is None
+
+
+def test_ensure_admin_creates_and_is_idempotent(monkeypatch):
+    from app import config as cfg
+    from app.auth import ensure_admin
+    from app.database import SessionLocal
+    from app.models import User
+
+    monkeypatch.setattr(cfg, "ADMIN_USERNAME", "boss")
+    monkeypatch.setattr(cfg, "ADMIN_PASSWORD", "hunter2")
+    ensure_admin()
+
+    db = SessionLocal()
+    try:
+        u = db.query(User).filter(User.username == "boss").first()
+        assert u is not None
+        assert u.is_admin is True
+        from app.auth import verify_password
+        assert verify_password("hunter2", u.password_hash) is True
+    finally:
+        db.close()
+
+    ensure_admin()
+    db = SessionLocal()
+    try:
+        assert db.query(User).filter(User.username == "boss").count() == 1
+    finally:
+        db.close()

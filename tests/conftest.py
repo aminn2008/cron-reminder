@@ -7,6 +7,8 @@ os.environ["DATABASE_URL"] = "sqlite:///" + tempfile.mktemp(suffix=".db")
 os.environ["SMTP_USER"] = ""
 os.environ["SMTP_PASSWORD"] = ""
 os.environ["TELEGRAM_BOT_TOKEN"] = ""
+os.environ["ADMIN_USERNAME"] = ""
+os.environ["ADMIN_PASSWORD"] = ""
 
 import pytest
 from fastapi.testclient import TestClient

@@ -1,13 +1,42 @@
 import hashlib
+import logging
 import secrets
 
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app import config
+from app.database import SessionLocal, get_db
 from app.models import AuthSession, User
 
+log = logging.getLogger("app")
+
 _PBKDF2_ITERATIONS = 200_000
+
+
+def ensure_admin() -> None:
+    """Create the ADMIN_USERNAME / ADMIN_PASSWORD user from .env on startup."""
+    username = config.ADMIN_USERNAME
+    password = config.ADMIN_PASSWORD
+    if not username or not password:
+        return
+    db = SessionLocal()
+    try:
+        if db.query(User).filter(User.username == username).first():
+            log.info("admin %s already exists — skipping", username)
+            return
+        db.add(
+            User(
+                username=username,
+                email=f"{username}@admin.local",
+                password_hash=hash_password(password),
+                is_admin=True,
+            )
+        )
+        db.commit()
+        log.info("admin %s created from .env", username)
+    finally:
+        db.close()
 
 
 def hash_password(password: str) -> str:

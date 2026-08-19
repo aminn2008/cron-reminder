@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app import config
 from app.auth import (
     create_session,
+    ensure_admin,
     get_current_user,
     hash_password,
     require_admin,
@@ -45,6 +46,7 @@ STATIC = ROOT / "static"
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
+    ensure_admin()
     start()
     tg_task = telegram_bot.start_on_loop()
     yield
