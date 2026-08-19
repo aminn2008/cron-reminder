@@ -28,6 +28,7 @@ A full-stack scheduled reminder service: users create **repeating** or **one-sho
 |---|---|
 | ![Dashboard](screenshots/dashboard.png) | ![New reminder](screenshots/create-modal.png) |
 | ![Login](screenshots/login.png) | ![Admin panel](screenshots/admin.png) |
+| ![Telegram bot — create flow](screenshots/bot-create.png) | ![Telegram bot — reminder delivery](screenshots/bot-reminder.png) |
 
 ## 🧱 Tech Stack
 
