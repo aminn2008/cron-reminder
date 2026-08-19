@@ -12,6 +12,7 @@ import json
 import logging
 import threading
 import time
+import urllib.error
 import urllib.request
 from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
@@ -445,6 +446,11 @@ def _handle_message(chat_id, text: str) -> None:
 
 
 def _handle_callback(chat_id, query_id, message_id, data: str) -> None:
+    # answer first so the button spinner stops immediately
+    try:
+        answer_callback(query_id, "Done ✅")
+    except Exception as e:
+        log.warning("answer_callback failed: %s", e)
     try:
         if data.startswith("new:preset:"):
             minutes = int(data.split(":")[2])
@@ -498,7 +504,11 @@ def _handle_callback(chat_id, query_id, message_id, data: str) -> None:
             edit_message(chat_id, message_id, text, reply_markup=kb)
         else:
             log.warning("unknown callback data: %s", data)
-        answer_callback(query_id, "Done ✅")
+    except urllib.error.HTTPError as e:
+        if e.code == 400 and "not modified" in str(e).lower():
+            log.info("callback edit: message not modified — ignoring")
+        else:
+            log.warning("callback handling failed: %s", e)
     except Exception as e:
         log.warning("callback handling failed: %s", e)
 
@@ -537,8 +547,10 @@ def _poll_loop() -> None:
                         if chat_id is not None and data:
                             _handle_callback(chat_id, query_id, message_id, data)
         except Exception as e:
+            # 409 = another long-poll is active (e.g. leftover from a restart) — back off longer
+            code = getattr(e, "code", None)
             log.warning("getUpdates failed: %s", e)
-            time.sleep(5)
+            time.sleep(30 if code == 409 else 5)
 
 
 def start() -> None:
