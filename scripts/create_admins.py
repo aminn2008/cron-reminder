@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""Create reserved admin accounts (admin / owner / root) with random passwords.
+\
+\
+\
 
-Usage: venv/bin/python scripts/create_admins.py
-"""
 import secrets
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.auth import hash_password  # noqa: E402
-from app.database import SessionLocal  # noqa: E402
-from app.models import User  # noqa: E402
+from app.auth import hash_password
+from app.database import SessionLocal
+from app.models import User
 
 NAMES = ["admin", "owner", "root"]
 EMAIL_DOMAIN = "meow.bahari.tr"

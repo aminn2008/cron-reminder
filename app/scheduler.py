@@ -1,4 +1,3 @@
-"""Background scheduler: interval & one-shot jobs with APScheduler."""
 import html
 import json
 import logging
@@ -28,7 +27,7 @@ def is_valid_cron(expr: str) -> bool:
 
 
 def next_run_time(expr: str, tz: str) -> datetime | None:
-    """Next execution time of a cron expression in the given timezone."""
+
     try:
         base = datetime.now(ZoneInfo(tz))
         return croniter(expr, base).get_next(datetime)
@@ -41,7 +40,7 @@ def next_run_interval(minutes: int, tz: str) -> datetime:
 
 
 def humanize_interval(m: int | None) -> str | None:
-    """'120' -> 'Every 2 hours'"""
+
     if not m or m < 1:
         return None
     months, rem = divmod(m, 43200)
@@ -78,13 +77,13 @@ def _send_telegram(chat_id: str, job: CronJob) -> None:
 
 
 def _job_id(job) -> str:
-    """Stable scheduler id — based on the job's uid, not its numeric rowid."""
+
     uid = getattr(job, "uid", None)
     return f"job_{uid}" if uid else f"job_{job.id}"
 
 
 def execute_job(job_id: int) -> None:
-    """Run a job and record the result in the logs."""
+
     db = SessionLocal()
     try:
         job = db.get(CronJob, job_id)
@@ -146,7 +145,7 @@ def execute_job(job_id: int) -> None:
                     )
                 )
 
-        # one-shot reminders turn themselves off after firing
+
         if job.send_once_at:
             job.enabled = False
             log.info("job %s fired once → disabled", job.id)
@@ -156,14 +155,14 @@ def execute_job(job_id: int) -> None:
 
 
 def sync_jobs() -> None:
-    """Reconcile the scheduler with the database.
+\
+\
+\
+\
+\
+\
+\
 
-    - removes ANY job that points at our executor (whatever its id scheme),
-      so stale triggers for deleted jobs can never survive a sync;
-    - re-adds every enabled job from the DB;
-    - disables one-shot reminders whose run date has already passed
-      (they must not fire late after an outage/restart).
-    """
     now = datetime.now(ZoneInfo("UTC"))
     removed = 0
     for job in scheduler.get_jobs():
@@ -182,7 +181,7 @@ def sync_jobs() -> None:
                 if job.send_once_at:
                     aware_utc = job.send_once_at.replace(tzinfo=ZoneInfo("UTC"))
                     if aware_utc <= now:
-                        # stale one-shot: never fire it late, just turn it off
+
                         job.enabled = False
                         log.info(
                             "job %s (%s): one-shot date %s already passed → disabled",

@@ -1,4 +1,3 @@
-"""احراز هویت: هش رمز عبور (PBKDF2)، سشن‌های مبتنی بر توکن و کوکی."""
 import hashlib
 import secrets
 

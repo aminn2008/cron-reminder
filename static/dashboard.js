@@ -1,7 +1,7 @@
 let jobs = [];
 let currentUserEmail = null;
 
-/* ─── interval helpers ─── */
+
 const UNIT_MINUTES = { minutes: 1, hours: 60, days: 1440, weeks: 10080, months: 43200 };
 
 function toMinutes(val, unit) {
@@ -45,7 +45,7 @@ function updateConversion() {
   conv.textContent = '= ' + humanizeInterval(m);
 }
 
-/* ─── schedule mode: repeat / send once ─── */
+
 function setMode(mode) {
   const once = mode === 'once';
   document.getElementById('mode-repeat').classList.toggle('active', !once);
@@ -55,7 +55,7 @@ function setMode(mode) {
   document.getElementById('f-interval').required = !once;
   document.getElementById('f-once-at').required = once;
   if (once && !document.getElementById('f-once-at').value) {
-    // default: now + 1 hour
+    
     const d = new Date(Date.now() + 3600 * 1000);
     const pad = (n) => String(n).padStart(2, '0');
     document.getElementById('f-once-at').value =
@@ -70,7 +70,7 @@ function toLocalInput(iso) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-/* ─── data loading ─── */
+
 async function loadAll() {
   try {
     const me = await api('/api/me');
@@ -82,7 +82,7 @@ async function loadAll() {
   await Promise.all([loadJobs(), loadStats(), loadLogs(), loadTelegramStatus(), loadTelegramPanel()]);
 }
 
-/* ─── telegram ─── */
+
 async function loadTelegramStatus() {
   try {
     const s = await api('/api/telegram/status');
@@ -115,7 +115,7 @@ async function testTelegram() {
   }
 }
 
-/* ─── telegram bind panel ─── */
+
 async function loadTelegramPanel() {
   const el = document.getElementById('tg-panel');
   if (!el) return;
@@ -219,7 +219,7 @@ async function loadLogs() {
     </tr>`).join('');
 }
 
-/* ─── actions ─── */
+
 async function runNow(id) {
   try {
     await api(`/api/jobs/${id}/run-now`, { method: 'POST' });
@@ -241,19 +241,19 @@ async function deleteJob(id) {
     await api(`/api/jobs/${id}`, { method: 'DELETE' });
     toast('Reminder deleted', 'success');
   } catch (e) {
-    toast(e.message, 'error');  // surface failures instead of silently ignoring them
+    toast(e.message, 'error');  
   }
   await Promise.all([loadJobs(), loadStats()]);
 }
 
-/* ─── modal ─── */
+
 function openModal(job) {
   document.getElementById('modal-title').textContent = job ? 'Edit reminder' : 'New reminder';
   document.getElementById('f-id').value = job ? job.id : '';
   document.getElementById('f-name').value = job ? job.name : '';
   document.getElementById('f-message').value = job ? job.message : '';
 
-  // email: default to the user's registered email
+  
   const emailHint = document.getElementById('f-email-default');
   emailHint.textContent = currentUserEmail ? 'Default: ' + currentUserEmail : '';
   document.getElementById('f-email').placeholder = currentUserEmail || 'Email address';
@@ -289,7 +289,7 @@ function closeModal() {
   document.getElementById('modal').classList.add('hidden');
 }
 
-// preset chips
+
 document.querySelectorAll('.preset').forEach((btn) => {
   btn.addEventListener('click', () => {
     const m = parseInt(btn.dataset.m, 10);
@@ -339,7 +339,7 @@ async function saveJob(e) {
 
 loadAll();
 
-// Live refresh — keeps logs & stats up to date automatically
+
 setInterval(() => {
   loadJobs().catch(() => {});
   loadStats().catch(() => {});

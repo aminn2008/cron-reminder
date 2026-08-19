@@ -1,4 +1,3 @@
-"""ارسال ایمیل با SMTP — ماژول مستقل که بعداً از بخش کرون‌ها هم صدا زده می‌شود."""
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -12,7 +11,7 @@ def send_email(
     text_body: str,
     html_body: str | None = None,
 ) -> None:
-    """یک ایمیل ارسال می‌کند. در صورت خطا exception پرتاب می‌شود."""
+
     if not config.smtp_ready():
         raise RuntimeError(
             "SMTP is not configured! Fill in SMTP_USER and SMTP_PASSWORD in the .env file."

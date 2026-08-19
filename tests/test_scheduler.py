@@ -1,8 +1,3 @@
-"""Regression tests for the scheduler.
-
-Covers the exact bug class reported by the user:
-"deleted the reminder, but it still fired".
-"""
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -15,7 +10,7 @@ from app.models import CronJob, User
 
 @pytest.fixture
 def sched_user(client):
-    """A bound user, created directly in the DB."""
+
     db = SessionLocal()
     try:
         u = User(
@@ -56,7 +51,7 @@ def _scheduled_job_ids():
 
 
 def _scheduled_with(job_id):
-    """True if any scheduler job targets this DB row id (args are tuple-safe)."""
+
     return any(list(j.args or []) == [job_id] for j in sched.scheduler.get_jobs())
 
 
@@ -71,7 +66,7 @@ def _delete_job(job_id):
 
 
 def test_deleted_job_is_removed_from_scheduler(sched_user):
-    """The reported bug: a deleted job must not stay scheduled."""
+
     job_id = _make_job(sched_user)
     sched.sync_jobs()
     assert _scheduled_with(job_id)
@@ -99,7 +94,7 @@ def test_disabled_job_is_removed_from_scheduler(sched_user):
 
 
 def test_stale_once_job_disabled_not_scheduled(sched_user):
-    """A one-shot whose date passed (e.g. while the app was down) must not fire late."""
+
     past = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=5)
     job_id = _make_job(sched_user, minutes=None, send_once_at=past)
     sched.sync_jobs()
@@ -121,7 +116,7 @@ def test_future_once_job_stays_scheduled(sched_user):
 
 
 def test_job_ids_use_uid_not_rowid(sched_user):
-    """Scheduler job ids must be uid-based so rowid reuse can't alias jobs."""
+
     job_id = _make_job(sched_user)
     sched.sync_jobs()
 

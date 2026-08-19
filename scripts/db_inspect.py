@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Inspect jobs & logs to trace a fired-after-delete incident."""
+
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.database import SessionLocal  # noqa: E402
-from app.models import CronJob, JobLog  # noqa: E402
+from app.database import SessionLocal
+from app.models import CronJob, JobLog
 
 db = SessionLocal()
 print("=== JOBS (now) ===")

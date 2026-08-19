@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Add the `uid` column to cron_jobs (SQLite) and backfill existing rows."""
+
 import sqlite3
 import uuid
 from pathlib import Path
@@ -14,13 +14,13 @@ if "uid" not in cols:
     cur.execute("ALTER TABLE cron_jobs ADD COLUMN uid VARCHAR(32)")
     print("added column uid")
 
-# backfill any rows without a uid (one unique uuid per row)
+
 rows = cur.execute("SELECT id FROM cron_jobs WHERE uid IS NULL OR uid = ''").fetchall()
 for (rid,) in rows:
     cur.execute("UPDATE cron_jobs SET uid = ? WHERE id = ?", (uuid.uuid4().hex, rid))
 print(f"backfilled {len(rows)} rows")
 
-# unique index (mirrors the model's unique=True)
+
 cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS ix_cron_jobs_uid ON cron_jobs (uid)")
 
 conn.commit()

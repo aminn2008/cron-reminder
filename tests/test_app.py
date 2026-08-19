@@ -1,11 +1,8 @@
-"""API tests for Cron Reminder."""
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from app.scheduler import humanize_interval
 
-
-# ─────────────────────────── auth ───────────────────────────
 
 def test_register_login_flow(client):
     r = client.post("/api/register", json={
@@ -14,7 +11,7 @@ def test_register_login_flow(client):
         "password": "secret123",
     })
     assert r.status_code == 200
-    assert r.json()["user"]["is_admin"] is False  # alice was the first user
+    assert r.json()["user"]["is_admin"] is False
 
     me = client.get("/api/me")
     assert me.status_code == 200
@@ -76,8 +73,6 @@ def test_change_password(client):
     assert client.post("/api/login", json={"username": "changer", "password": "newsecret456"}).status_code == 200
 
 
-# ─────────────────────────── jobs ───────────────────────────
-
 def test_create_interval_job_defaults_email(authed_user):
     client, user = authed_user
     r = client.post("/api/jobs", json={
@@ -89,7 +84,7 @@ def test_create_interval_job_defaults_email(authed_user):
     job = r.json()["job"]
     assert job["type"] == "repeat"
     assert job["interval_label"] == "Every 2 hours"
-    assert job["email_to"] == user["email"]  # defaulted to registered email
+    assert job["email_to"] == user["email"]
     assert job["enabled"] is True
     assert job["next_run"] is not None
 
@@ -122,18 +117,18 @@ def test_create_send_once_in_past_rejected(authed_user):
 
 def test_job_validation(authed_user):
     client, user = authed_user
-    # no schedule mode
+
     assert client.post("/api/jobs", json={"name": "X", "email_to": user["email"]}).status_code == 400
-    # two modes at once
+
     assert client.post("/api/jobs", json={
         "name": "X", "interval_minutes": 60, "send_once_at": "2099-01-01T10:00",
         "email_to": user["email"],
     }).status_code == 400
-    # invalid interval
+
     assert client.post("/api/jobs", json={"name": "X", "interval_minutes": 0, "email_to": user["email"]}).status_code == 400
-    # invalid email
+
     assert client.post("/api/jobs", json={"name": "X", "interval_minutes": 60, "email_to": "not-an-email"}).status_code == 400
-    # missing name
+
     assert client.post("/api/jobs", json={"name": " ", "interval_minutes": 60, "email_to": user["email"]}).status_code == 400
 
 
@@ -177,8 +172,6 @@ def test_run_now_writes_log(authed_user, monkeypatch):
     assert any(l["job_id"] == job_id and l["status"] == "success" for l in logs)
 
 
-# ─────────────────────────── admin ───────────────────────────
-
 def test_admin_endpoints(client):
     r = client.post("/api/login", json={"username": "alice", "password": "secret123"})
     assert r.status_code == 200
@@ -201,8 +194,6 @@ def test_non_admin_forbidden(authed_user):
     r = client.get("/api/admin/overview")
     assert r.status_code == 403
 
-
-# ─────────────────────────── helpers ───────────────────────────
 
 def test_humanize_interval():
     assert humanize_interval(1) == "Every 1 minute"

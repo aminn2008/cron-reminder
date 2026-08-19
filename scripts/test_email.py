@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Quick SMTP email test from the CLI.
+\
+\
+\
 
-Usage: venv/bin/python scripts/test_email.py you@example.com
-"""
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.email_sender import send_email  # noqa: E402
+from app.email_sender import send_email
 
 
 def main() -> None:

@@ -41,8 +41,8 @@ class CronJob(Base):
     __tablename__ = "cron_jobs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    # stable identity: survives SQLite rowid reuse so stale scheduler triggers
-    # can never alias a brand-new job that happens to get the same numeric id
+
+
     uid: Mapped[str] = mapped_column(
         String(32), unique=True, index=True, default=lambda: uuid.uuid4().hex
     )
@@ -51,9 +51,9 @@ class CronJob(Base):
     )
     name: Mapped[str] = mapped_column(String(120))
     message: Mapped[str] = mapped_column(Text, default="")
-    cron_expr: Mapped[str] = mapped_column(String(50), default="")  # legacy cron (optional)
-    interval_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)  # repeat interval in minutes
-    send_once_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # one-shot reminder (UTC naive)
+    cron_expr: Mapped[str] = mapped_column(String(50), default="")
+    interval_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    send_once_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     timezone: Mapped[str] = mapped_column(String(50), default="Asia/Tehran")
     email_to: Mapped[str | None] = mapped_column(String(120), nullable=True)
     telegram_chat_id: Mapped[str | None] = mapped_column(String(50), nullable=True)
@@ -73,8 +73,8 @@ class JobLog(Base):
     job_id: Mapped[int] = mapped_column(
         ForeignKey("cron_jobs.id", ondelete="CASCADE"), index=True
     )
-    channel: Mapped[str] = mapped_column(String(20))  # email | telegram
-    status: Mapped[str] = mapped_column(String(20))  # success | failed | skipped
+    channel: Mapped[str] = mapped_column(String(20))
+    status: Mapped[str] = mapped_column(String(20))
     detail: Mapped[str] = mapped_column(Text, default="")
     executed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

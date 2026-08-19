@@ -1,23 +1,22 @@
-"""Test setup: isolated temp database, fresh client per test, no real emails."""
 import os
 import tempfile
 import uuid
 
-# must be set BEFORE importing the app
+
 os.environ["DATABASE_URL"] = "sqlite:///" + tempfile.mktemp(suffix=".db")
 os.environ["SMTP_USER"] = ""
 os.environ["SMTP_PASSWORD"] = ""
-os.environ["TELEGRAM_BOT_TOKEN"] = ""  # keep the real bot out of tests
+os.environ["TELEGRAM_BOT_TOKEN"] = ""
 
-import pytest  # noqa: E402
-from fastapi.testclient import TestClient  # noqa: E402
+import pytest
+from fastapi.testclient import TestClient
 
-from app.main import app  # noqa: E402
+from app.main import app
 
 
 @pytest.fixture(scope="session", autouse=True)
 def seed_admin():
-    """First user ever registered becomes admin — create that user once."""
+
     with TestClient(app) as c:
         r = c.post("/api/register", json={
             "username": "alice",
@@ -29,7 +28,7 @@ def seed_admin():
 
 @pytest.fixture()
 def client():
-    """Fresh TestClient (no cookies carried over between tests)."""
+
     with TestClient(app) as c:
         yield c
 
@@ -44,7 +43,7 @@ def clean_rate_limit():
 
 @pytest.fixture()
 def authed_user(client):
-    """Register + login a fresh user; returns (client, user dict)."""
+
     name = "user" + uuid.uuid4().hex[:8]
     r = client.post("/api/register", json={
         "username": name,

@@ -39,12 +39,12 @@ async function doRegister(e) {
   }
 }
 
-// Already logged in? Go straight to the dashboard
+
 api('/api/me')
   .then(() => (location.href = '/dashboard'))
   .catch(() => {});
 
-// Telegram Web App (Mini App): auto-login with initData
+
 async function tryTelegramWebApp() {
   try {
     const tg = window.Telegram && window.Telegram.WebApp;

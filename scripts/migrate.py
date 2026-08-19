@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Database migration: add missing columns (interval_minutes, send_once_at).
+\
+\
+\
 
-Usage: venv/bin/python scripts/migrate.py
-"""
 import sqlite3
 from pathlib import Path
 

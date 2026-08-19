@@ -1,4 +1,3 @@
-"""Tests for the Telegram bot: bind flow, menu buttons, state machine, callbacks."""
 import uuid
 
 import pytest
@@ -10,7 +9,7 @@ from app.models import CronJob, User
 
 @pytest.fixture
 def tg_api_stub(monkeypatch):
-    """Stub the Telegram messaging functions so no real network calls happen."""
+
     calls = []
 
     def fake_send(chat_id, text, reply_markup=None):
@@ -88,7 +87,7 @@ def test_menu_button_new_flow(client, tg_api_stub):
     assert jobs[0].telegram_chat_id == "777"
     assert jobs[0].name == "Coffee time"
     assert jobs[0].message == "Coffee time"
-    assert jobs[0].email_to == f"{username}@example.com"  # default email applied
+    assert jobs[0].email_to == f"{username}@example.com"
 
 
 def test_channel_email_only(client, tg_api_stub):
@@ -180,7 +179,7 @@ def test_list_pause_delete(client, tg_api_stub):
     assert jobs[0].id == j1.id
     assert jobs[0].enabled is False
 
-    # resume via callback
+
     telegram_bot._handle_callback(777, "q", 10, f"job:resume:{j1.id}")
     jobs = _jobs_of(username)
     assert jobs[0].enabled is True

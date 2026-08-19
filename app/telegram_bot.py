@@ -1,12 +1,3 @@
-"""Telegram bot with an interactive button menu (aiogram).
-
-Features:
-- Reply keyboard menu: New reminder / My reminders / Help / Bind account
-- Inline keyboards: interval presets, per-job pause/resume/delete buttons
-- /bind <code> links a chat to a website account
-- Text commands: /new, /once, /list, /pause, /resume, /delete
-- Sending reminders is handled by app/scheduler.py (_send_telegram)
-"""
 import asyncio
 import hashlib
 import hmac
@@ -44,14 +35,12 @@ log.setLevel(logging.INFO)
 _bot: Bot | None = None
 _loop: asyncio.AbstractEventLoop | None = None
 
-# per-chat state for the "new reminder" flow: {chat_id: {"step": ..., "minutes": ...}}
+
 _states: dict[int, dict] = {}
 
 
-# ─────────────────────────── low-level API (aiogram) ───────────────────────────
-
 def _to_markup(raw: dict | None):
-    """Convert the plain-dict keyboards used by the logic layer to aiogram objects."""
+
     if raw is None:
         return None
 
@@ -78,14 +67,14 @@ def _to_markup(raw: dict | None):
 
 
 def _to_edit_markup(raw: dict | None):
-    """editMessageText only accepts inline keyboards — reply keyboards are invalid there."""
+
     if raw and "inline_keyboard" in raw:
         return _to_markup(raw)
     return None
 
 
 def _run_coro(coro, timeout: float = 20):
-    """Schedule a coroutine onto the bot's event loop and wait for the result."""
+
     if _loop is None or _bot is None:
         raise RuntimeError("Telegram bot is not running")
     return asyncio.run_coroutine_threadsafe(coro, _loop).result(timeout=timeout)
@@ -128,7 +117,7 @@ def answer_callback(query_id, text: str) -> None:
 
 
 def _safe_edit(chat_id, message_id, text: str, reply_markup=None) -> None:
-    """Edit a message; Telegram's 'message is not modified' is a harmless no-op."""
+
     try:
         edit_message(chat_id, message_id, text, reply_markup=reply_markup)
     except Exception as e:
@@ -137,8 +126,6 @@ def _safe_edit(chat_id, message_id, text: str, reply_markup=None) -> None:
         else:
             raise
 
-
-# ─────────────────────────── keyboards ───────────────────────────
 
 def _inline(rows: list) -> dict:
     return {"inline_keyboard": rows}
@@ -196,8 +183,6 @@ def _help_text() -> str:
     )
 
 
-# ─────────────────────────── helpers ───────────────────────────
-
 def _get_user(chat_id):
     db = SessionLocal()
     try:
@@ -237,7 +222,7 @@ def _create_job(
     send_once_at=None,
     channels: str = "both",
 ) -> None:
-    """Create a reminder. channels: 'email' | 'telegram' | 'both'."""
+
     user = _get_user(chat_id)
     if not user:
         _need_bind(chat_id)
@@ -306,8 +291,6 @@ def _render_list(user) -> tuple[str, dict | None]:
     ])
     return "\n".join(lines), _inline(rows)
 
-
-# ─────────────────────────── commands ───────────────────────────
 
 def _cmd_bind(chat_id, args) -> None:
     if not args:
@@ -462,14 +445,12 @@ def _handle_command(chat_id, text: str) -> None:
         send_message(chat_id, "Unknown command — send /help")
 
 
-# ─────────────────────────── message & callback handling ───────────────────────────
-
 def _handle_message(chat_id, text: str) -> None:
     text = (text or "").strip()
     if not text:
         return
 
-    # reply-keyboard menu labels
+
     if text == "➕ New reminder":
         _start_new(chat_id)
         return
@@ -492,7 +473,7 @@ def _handle_message(chat_id, text: str) -> None:
         _handle_command(chat_id, text)
         return
 
-    # state machine: waiting for interval → message → channel
+
     state = _states.get(chat_id)
     if state and state.get("step") == "minutes":
         try:
@@ -528,12 +509,12 @@ def _handle_message(chat_id, text: str) -> None:
         )
         return
 
-    # anything else → help
+
     send_message(chat_id, _help_text(), MAIN_KEYBOARD)
 
 
 def _handle_callback(chat_id, query_id, message_id, data: str) -> None:
-    result = "Done ✅"  # what the button toast will say — set by each branch
+    result = "Done ✅"
     try:
         if data.startswith("new:preset:"):
             minutes = int(data.split(":")[2])
@@ -562,7 +543,7 @@ def _handle_callback(chat_id, query_id, message_id, data: str) -> None:
                 return
             minutes = state.get("minutes")
             message_text = state.get("message") or "Reminder"
-            channels = data.split(":")[1]  # email | telegram | both
+            channels = data.split(":")[1]
             _create_job(chat_id, message_text[:120], message=message_text, minutes=minutes, channels=channels)
             result = "Reminder created ✅"
             email_desc = user.email if channels in ("email", "both") else "—"
@@ -628,12 +609,10 @@ def _handle_callback(chat_id, query_id, message_id, data: str) -> None:
             log.warning("answer_callback failed: %s", e)
 
 
-# ─────────────────────────── aiogram handlers & lifecycle ───────────────────────────
-
 async def _on_message(message: Message) -> None:
     if not message.text:
         return
-    # run the sync logic in a worker thread so the event loop stays responsive
+
     await asyncio.to_thread(_handle_message, message.chat.id, message.text)
 
 
@@ -654,9 +633,9 @@ async def _main() -> None:
     dp = Dispatcher()
     dp.message.register(_on_message)
     dp.callback_query.register(_on_callback)
-    # clear any stale webhook / pending long-polls that would block getUpdates
+
     await _bot.delete_webhook(drop_pending_updates=True)
-    # "Open App" button next to the chat input (Web App / Mini App)
+
     try:
         await _bot.set_chat_menu_button(
             menu_button=MenuButtonWebApp(
@@ -672,11 +651,11 @@ async def _main() -> None:
 
 
 def start_on_loop():
-    """Start polling as a task on the app's main event loop.
+\
+\
+\
+\
 
-    Returns the task (or None when the bot is disabled). aiogram/aiohttp need
-    the main thread's loop, so we share uvicorn's loop instead of a thread.
-    """
     global _loop
     if not config.TELEGRAM_BOT_TOKEN:
         log.info("TELEGRAM_BOT_TOKEN not set — Telegram bot disabled")
@@ -688,10 +667,10 @@ def start_on_loop():
 
 
 def validate_init_data(init_data: str, bot_token: str | None = None) -> dict | None:
-    """Validate Telegram Web App initData (HMAC) and return the user dict.
+\
+\
+\
 
-    Returns None when the signature is invalid or too old (>24h).
-    """
     token = bot_token or config.TELEGRAM_BOT_TOKEN
     if not token or not init_data:
         return None

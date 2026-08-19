@@ -1,5 +1,3 @@
-"""Cron Reminder — scheduled reminder service
-Full API: auth, interval/one-shot job management, run-now, logs, admin panel, Telegram."""
 import logging
 import secrets
 from contextlib import asynccontextmanager
@@ -7,7 +5,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from croniter import croniter
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -59,8 +56,6 @@ app = FastAPI(title="Cron Reminder", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
-# ─────────────────────────── security ───────────────────────────
-
 LOGIN_MAX_ATTEMPTS = 5
 LOGIN_WINDOW_SECONDS = 600
 _login_attempts: dict[str, list[float]] = {}
@@ -82,8 +77,6 @@ async def security_headers(request: Request, call_next):
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     return response
 
-
-# ─────────────────────────── helpers ───────────────────────────
 
 def _fmt(dt: datetime | None, tz: str) -> str | None:
     if dt is None:
@@ -147,8 +140,6 @@ def log_dict(l: JobLog, job_name: str | None = None) -> dict:
     }
 
 
-# ─────────────────────────── pages ───────────────────────────
-
 @app.get("/")
 def index():
     return FileResponse(PAGES / "index.html")
@@ -169,8 +160,6 @@ def health():
     from app.scheduler import scheduler
     return {"status": "ok", "scheduler_running": scheduler.running}
 
-
-# ─────────────────────────── telegram ───────────────────────────
 
 @app.get("/api/telegram/status")
 def telegram_status(user: User = Depends(get_current_user)):
@@ -209,7 +198,7 @@ def telegram_bind_code(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Generates a 6-char code the user sends to the bot via /bind <code>."""
+
     code = secrets.token_hex(3).upper()
     user.bind_code = code
     user.bind_code_expires = datetime.now(UTC).replace(tzinfo=None) + timedelta(minutes=10)
@@ -238,7 +227,7 @@ class WebAppLoginBody(BaseModel):
 
 @app.post("/api/telegram/webapp-login")
 def webapp_login(body: WebAppLoginBody, db: Session = Depends(get_db)):
-    """Log in via Telegram Web App initData (HMAC-validated)."""
+
     user_data = telegram_bot.validate_init_data(body.init_data)
     if not user_data:
         raise HTTPException(401, "Invalid Telegram session")
@@ -254,8 +243,6 @@ def webapp_login(body: WebAppLoginBody, db: Session = Depends(get_db)):
     resp.set_cookie("session", token, httponly=True, samesite="lax", max_age=60 * 60 * 24 * 30)
     return resp
 
-
-# ─────────────────────────── auth ───────────────────────────
 
 class RegisterBody(BaseModel):
     username: str
@@ -284,7 +271,7 @@ def register(body: RegisterBody, db: Session = Depends(get_db)):
     if exists:
         raise HTTPException(400, "Username or email is already registered")
 
-    is_first = db.query(User).count() == 0  # first user becomes admin
+    is_first = db.query(User).count() == 0
     user = User(
         username=username,
         email=email,
@@ -350,8 +337,6 @@ def change_password(
     db.commit()
     return {"success": True}
 
-
-# ─────────────────────────── jobs ───────────────────────────
 
 class JobBody(BaseModel):
     name: str
@@ -429,7 +414,7 @@ def create_job(
     )
     _apply_job_body(job, body)
     if not job.email_to:
-        job.email_to = user.email  # default to the user's registered email
+        job.email_to = user.email
     db.add(job)
     db.commit()
     db.refresh(job)
@@ -450,7 +435,7 @@ def update_job(
     _validate_job_body(body, user.email)
     _apply_job_body(job, body)
     if not job.email_to:
-        job.email_to = user.email  # default to the user's registered email
+        job.email_to = user.email
     db.commit()
     sync_jobs()
     return {"job": job_dict(job)}
@@ -493,15 +478,13 @@ def run_now(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Instant test run — no need to wait for the next interval."""
+
     job = db.get(CronJob, job_id)
     if not job or job.user_id != user.id:
         raise HTTPException(404, "Reminder not found")
     execute_job(job.id)
     return {"success": True}
 
-
-# ─────────────────────────── logs & stats ───────────────────────────
 
 @app.get("/api/logs")
 def my_logs(
@@ -543,8 +526,6 @@ def my_stats(user: User = Depends(get_current_user), db: Session = Depends(get_d
         )
     return {"total": total, "enabled": enabled, "success": success, "failed": failed}
 
-
-# ─────────────────────────── admin panel ───────────────────────────
 
 @app.get("/api/admin/overview")
 def admin_overview(_: User = Depends(require_admin), db: Session = Depends(get_db)):

@@ -61,7 +61,7 @@ async function loadLogs() {
 
 loadAll();
 
-// Live refresh for the admin panel
+
 setInterval(() => {
   loadOverview().catch(() => {});
   loadJobs().catch(() => {});

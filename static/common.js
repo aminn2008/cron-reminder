@@ -1,11 +1,11 @@
-/* Shared frontend helpers */
+
 async function api(path, opts = {}) {
   const res = await fetch(path, {
     headers: { 'Content-Type': 'application/json' },
     ...opts,
   });
   if (res.status === 401) {
-    // Only redirect if we are not already on the login page (prevents refresh loops)
+    
     if (location.pathname !== '/') location.href = '/';
     throw new Error('unauthorized');
   }
