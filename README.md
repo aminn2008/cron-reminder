@@ -1,6 +1,6 @@
 # ⏰ Cron Reminder
 
-A full-stack scheduled reminder service: users create **repeating** or **one-shot** reminders and receive them via **email** (SMTP) or **Telegram**. Built with FastAPI, APScheduler and aiogram, with a Persian RTL web dashboard.
+A full-stack scheduled reminder service: users create **repeating** or **one-shot** reminders and receive them via **email** (SMTP) or **Telegram**. Built with FastAPI, APScheduler and aiogram, with a clean dark web dashboard.
 
 **Live:** http://meow.bahari.tr
 
@@ -35,7 +35,7 @@ A full-stack scheduled reminder service: users create **repeating** or **one-sho
 - **Backend:** Python 3.11 · FastAPI · SQLAlchemy 2.0 · APScheduler (interval/date triggers + croniter)
 - **Bot:** aiogram 3 (async, runs on the app's event loop)
 - **Database:** SQLite (file-based, `DATABASE_URL`-configurable — PostgreSQL-ready via SQLAlchemy)
-- **Frontend:** vanilla HTML/CSS/JS, dark RTL UI
+- **Frontend:** vanilla HTML/CSS/JS, dark UI
 - **Deployment:** uvicorn · systemd · nginx reverse proxy
 
 ## 📁 Project Structure
@@ -52,7 +52,7 @@ cron-reminder/
 │   ├── config.py        # .env config
 │   ├── database.py      # engine / session
 │   └── logging_setup.py # rotating file logging
-├── pages/               # index (login), dashboard, admin — RTL Persian
+├── pages/               # index (login), dashboard, admin — English UI
 ├── static/              # style.css + auth/dashboard/admin/common JS
 ├── scripts/             # migrate, create_admins, test_email, backup_db
 ├── tests/               # 34 pytest tests (isolated temp DB, no real emails)
