@@ -7,6 +7,7 @@ Long-polls the Bot API in a background thread. Features:
 - Text commands: /new, /once, /list, /pause, /resume, /delete
 - Sending reminders is handled by app/scheduler.py (_send_telegram)
 """
+import html
 import json
 import logging
 import threading
@@ -55,7 +56,7 @@ def get_me() -> dict | None:
 
 
 def send_message(chat_id, text: str, reply_markup=None) -> None:
-    payload = {"chat_id": chat_id, "text": text}
+    payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
     if reply_markup is not None:
         payload["reply_markup"] = reply_markup
     data = _api("sendMessage", payload)
@@ -64,7 +65,12 @@ def send_message(chat_id, text: str, reply_markup=None) -> None:
 
 
 def edit_message(chat_id, message_id, text: str, reply_markup=None) -> None:
-    payload = {"chat_id": chat_id, "message_id": message_id, "text": text}
+    payload = {
+        "chat_id": chat_id,
+        "message_id": message_id,
+        "text": text,
+        "parse_mode": "HTML",
+    }
     if reply_markup is not None:
         payload["reply_markup"] = reply_markup
     _api("editMessageText", payload)
@@ -204,7 +210,7 @@ def _render_list(user) -> tuple[str, dict | None]:
         else:
             label = humanize_interval(j.interval_minutes) or (j.cron_expr or "?")
         status = "✅" if j.enabled else "⏸"
-        lines.append(f"{j.id}. {j.name} — {label} {status}")
+        lines.append(f"{j.id}. {html.escape(j.name)} — {html.escape(label)} {status}")
         rows.append([
             {
                 "text": "⏸ Pause" if j.enabled else "▶️ Resume",
@@ -245,7 +251,7 @@ def _cmd_bind(chat_id, args) -> None:
         db.commit()
         send_message(
             chat_id,
-            f"✅ Linked to account <b>@{user.username}</b> ({user.email})!\n\n"
+            f"✅ Linked to account <b>@{html.escape(user.username)}</b> ({html.escape(user.email)})!\n\n"
             "You can now create and manage reminders from here. Press 📋 My reminders to start.",
             MAIN_KEYBOARD,
         )
@@ -263,7 +269,7 @@ def _cmd_new_quick(chat_id, args) -> None:
         return
     name = " ".join(args[1:])[:120]
     _create_job(chat_id, name, minutes=minutes)
-    send_message(chat_id, f"✅ Reminder created: <b>{name}</b> — {humanize_interval(minutes)}")
+    send_message(chat_id, f"✅ Reminder created: <b>{html.escape(name)}</b> — {humanize_interval(minutes)}")
 
 
 def _cmd_once(chat_id, args) -> None:
@@ -281,7 +287,7 @@ def _cmd_once(chat_id, args) -> None:
         return
     name = " ".join(args[2:])[:120] or "Reminder"
     _create_job(chat_id, name, send_once_at=aware.astimezone(UTC).replace(tzinfo=None))
-    send_message(chat_id, f"✅ One-shot reminder created: <b>{name}</b> — {aware.strftime('%Y-%m-%d %H:%M')}")
+    send_message(chat_id, f"✅ One-shot reminder created: <b>{html.escape(name)}</b> — {aware.strftime('%Y-%m-%d %H:%M')}")
 
 
 def _cmd_list(chat_id) -> None:
@@ -313,7 +319,7 @@ def _cmd_toggle(chat_id, action: str, args) -> None:
     finally:
         db.close()
     sync_jobs()
-    send_message(chat_id, f"{'▶️ Resumed' if action == 'resume' else '⏸ Paused'}: <b>{job.name}</b>")
+    send_message(chat_id, f"{'▶️ Resumed' if action == 'resume' else '⏸ Paused'}: <b>{html.escape(job.name)}</b>")
 
 
 def _cmd_delete(chat_id, args) -> None:
@@ -335,7 +341,7 @@ def _cmd_delete(chat_id, args) -> None:
     finally:
         db.close()
     sync_jobs()
-    send_message(chat_id, f"🗑 Deleted: <b>{job.name}</b>")
+    send_message(chat_id, f"🗑 Deleted: <b>{html.escape(job.name)}</b>")
 
 
 def _start_new(chat_id) -> None:
@@ -428,7 +434,7 @@ def _handle_message(chat_id, text: str) -> None:
         _states.pop(chat_id, None)
         send_message(
             chat_id,
-            f"✅ Reminder created: <b>{name}</b> — {humanize_interval(state.get('minutes'))}\n\n"
+            f"✅ Reminder created: <b>{html.escape(name)}</b> — {humanize_interval(state.get('minutes'))}\n\n"
             "Manage it anytime with 📋 My reminders.",
             MAIN_KEYBOARD,
         )
@@ -519,7 +525,7 @@ def _poll_loop() -> None:
                             except Exception as e:
                                 log.warning("message handling failed: %s", e)
                                 try:
-                                    send_message(chat_id, f"⚠️ Error: {e}")
+                                    send_message(chat_id, f"⚠️ Error: {html.escape(str(e))}")
                                 except Exception:
                                     pass
                     elif "callback_query" in upd:
