@@ -22,6 +22,13 @@ A full-stack scheduled reminder service: users create **repeating** or **one-sho
 - 🛡️ **Scheduler safety** — uid-based job ids (rowid-reuse safe), full scheduler/DB reconciliation on every change, stale one-shots auto-disabled, deleted jobs can never fire
 - 📝 **File logging** — rotating `logs/app.log` traces every schedule/delete/fire
 
+## 📸 Screenshots
+
+| | |
+|---|---|
+| ![Dashboard](screenshots/dashboard.png) | ![New reminder](screenshots/create-modal.png) |
+| ![Login](screenshots/login.png) | ![Admin panel](screenshots/admin.png) |
+
 ## 🧱 Tech Stack
 
 - **Backend:** Python 3.11 · FastAPI · SQLAlchemy 2.0 · APScheduler (interval/date triggers + croniter)
